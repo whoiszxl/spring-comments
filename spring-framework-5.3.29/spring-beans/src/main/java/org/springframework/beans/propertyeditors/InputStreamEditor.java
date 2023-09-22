@@ -64,14 +64,23 @@ public class InputStreamEditor extends PropertyEditorSupport {
 	}
 
 
+	/**
+	 * 将字符串转换成InputStream类型
+	 *
+	 *
+	 */
 	@Override
 	public void setAsText(String text) throws IllegalArgumentException {
+		// 调用被组合的ResourceEditor的setAsText方法,将传入的text转换成Resource对象。
 		this.resourceEditor.setAsText(text);
 		Resource resource = (Resource) this.resourceEditor.getValue();
 		try {
+			// 如果Resource不为空,则调用getInputStream()获取其InputStream。
+			// 使用获取的InputStream设置当前Editor的值
 			setValue(resource != null ? resource.getInputStream() : null);
 		}
 		catch (IOException ex) {
+			// 如果获取InputStream失败,抛出IllegalArgumentException异常
 			throw new IllegalArgumentException("Failed to retrieve InputStream for " + resource, ex);
 		}
 	}

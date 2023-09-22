@@ -22,28 +22,39 @@
 
 <!--	<bean id="listener" class="com.whoiszxl.ContextRefreshedApplicationListener"/>-->
 
-<!--	<bean id="myProcessor" class="com.whoiszxl.MyProcessor"/>-->
+	<bean id="myBeanPostProcessor" class="com.whoiszxl.processor.MyBeanPostProcessor"/>
 
-<!--	<bean id="myBeanDefinitionProcessor" class="com.whoiszxl.MyBeanDefinitionProcessor"/>-->
+<!--	<bean id="myBeanDefinitionProcessor" class="com.whoiszxl.processor.MyBeanDefinitionProcessor"/>-->
 
-<!--	<bean id="myBeanFactoryProcessor" class="com.whoiszxl.MyBeanFactoryProcessor"/>-->
+<!--	<bean id="myBeanFactoryProcessor" class="com.whoiszxl.processor.MyBeanFactoryProcessor"/>-->
 
 <!--	<bean id="beanNameAwareImpl" class="com.whoiszxl.BeanNameAwareImpl" >-->
 <!--		<property name="beanName" value="hahahaha"/>-->
 <!--		<property name="password" value="papa"/>-->
 <!--	</bean>-->
 
-<!--	<bean id="myListener" class="com.whoiszxl.event.MyEventListener"/>-->
+	<bean id="myListener" class="com.whoiszxl.event.MyEventListener"/>
 
 <!--	<bean id="batMan" class="com.whoiszxl.BatMan"/>-->
 
+	<bean id="tiger" class="com.whoiszxl.entity.Tiger">
+		<constructor-arg index="0" type="java.lang.String" name="name" value="司马懿">
+			<description>name赋值</description>
+		</constructor-arg>
+		<constructor-arg index="1" type="java.lang.Integer" name="age" value="50"/>
+		<property value="1" name="age"/>
+	</bean>
 
-
-	<bean id="monkey" class="com.whoiszxl.entity.Monkey">
+	<bean id="monkey" lazy-init="true" class="com.whoiszxl.entity.Monkey" name="monkey-one,monkey-two;monkey-three monkey-four">
 		<property name="name" value="孙悟空"/>
- 	</bean>
+	</bean>
 
-	<bean id="monkey2" class="com.whoiszxl.entity.Monkey2">
+	<bean class="com.whoiszxl.entity.Monkey">
+		<property name="name" value="孙悟空"/>
+	</bean>
+
+
+	<bean id="monkey3" class="com.whoiszxl.entity.Monkey2">
 		<property name="beanName" value="孙悟空2"/>
 	</bean>
 </beans>

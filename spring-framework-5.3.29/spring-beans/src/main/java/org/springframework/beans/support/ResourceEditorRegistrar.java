@@ -97,10 +97,16 @@ public class ResourceEditorRegistrar implements PropertyEditorRegistrar {
 	 * @see org.springframework.beans.propertyeditors.ClassEditor
 	 * @see org.springframework.beans.propertyeditors.ClassArrayEditor
 	 * @see org.springframework.core.io.support.ResourceArrayPropertyEditor
+	 *
+	 * 向属性编辑器注册库(PropertyEditorRegistry)中注册一些资源编辑器(Resource Editor)
+	 * 这些编辑器可以用来将字符串转换为资源类型,方便在Spring中注入各种资源。整体上是配置Spring的资源处理相关的编辑器。
 	 */
 	@Override
 	public void registerCustomEditors(PropertyEditorRegistry registry) {
+		// 创建一个基础的ResourceEditor,传入resourceLoader和propertyResolver
 		ResourceEditor baseEditor = new ResourceEditor(this.resourceLoader, this.propertyResolver);
+
+		// 使用该ResourceEditor注册处理各种资源类型的Editor,比如InputStreamEditor、FileEditor等
 		doRegisterEditor(registry, Resource.class, baseEditor);
 		doRegisterEditor(registry, ContextResource.class, baseEditor);
 		doRegisterEditor(registry, WritableResource.class, baseEditor);
@@ -111,11 +117,13 @@ public class ResourceEditorRegistrar implements PropertyEditorRegistrar {
 		doRegisterEditor(registry, Reader.class, new ReaderEditor(baseEditor));
 		doRegisterEditor(registry, URL.class, new URLEditor(baseEditor));
 
+		// 注册处理URI、Class等类型的Editor
 		ClassLoader classLoader = this.resourceLoader.getClassLoader();
 		doRegisterEditor(registry, URI.class, new URIEditor(classLoader));
 		doRegisterEditor(registry, Class.class, new ClassEditor(classLoader));
 		doRegisterEditor(registry, Class[].class, new ClassArrayEditor(classLoader));
 
+		// 如果resourceLoader是ResourcePatternResolver类型,还会额外注册一个ResourceArrayPropertyEditor。
 		if (this.resourceLoader instanceof ResourcePatternResolver) {
 			doRegisterEditor(registry, Resource[].class,
 					new ResourceArrayPropertyEditor((ResourcePatternResolver) this.resourceLoader, this.propertyResolver));

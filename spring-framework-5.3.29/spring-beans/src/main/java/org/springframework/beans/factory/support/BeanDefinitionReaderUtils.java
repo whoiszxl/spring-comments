@@ -56,14 +56,17 @@ public abstract class BeanDefinitionReaderUtils {
 	 */
 	public static AbstractBeanDefinition createBeanDefinition(
 			@Nullable String parentName, @Nullable String className, @Nullable ClassLoader classLoader) throws ClassNotFoundException {
-
+		//NEW一个GenericBeanDefinition出来
 		GenericBeanDefinition bd = new GenericBeanDefinition();
 		bd.setParentName(parentName);
+		// 如果className不为空
 		if (className != null) {
+			// 如果classLoader不为空，通过classLoader拿到这个bean的class
 			if (classLoader != null) {
 				bd.setBeanClass(ClassUtils.forName(className, classLoader));
 			}
 			else {
+				// class为空，则直接将className设置到GenericBeanDefinition中
 				bd.setBeanClassName(className);
 			}
 		}
@@ -160,10 +163,12 @@ public abstract class BeanDefinitionReaderUtils {
 			throws BeanDefinitionStoreException {
 
 		// Register bean definition under primary name.
+		// 从holder中拿到bean的名称和BeanDefinition，使用BeanDefinitionRegistry注册
 		String beanName = definitionHolder.getBeanName();
 		registry.registerBeanDefinition(beanName, definitionHolder.getBeanDefinition());
 
 		// Register aliases for bean name, if any.
+		// 如果有aliases别名的话，将别名也注册进去
 		String[] aliases = definitionHolder.getAliases();
 		if (aliases != null) {
 			for (String alias : aliases) {

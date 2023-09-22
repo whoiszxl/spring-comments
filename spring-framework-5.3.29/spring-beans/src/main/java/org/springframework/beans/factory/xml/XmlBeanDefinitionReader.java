@@ -311,7 +311,7 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 	 */
 	@Override
 	public int loadBeanDefinitions(Resource resource) throws BeanDefinitionStoreException {
-		// 此处将resource包装成EncodedResource
+		// 此处将resource包装成EncodedResource，并进行加载
 		return loadBeanDefinitions(new EncodedResource(resource));
 	}
 
@@ -331,7 +331,7 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 			logger.trace("Loading XML bean definitions from " + encodedResource);
 		}
 
-		// 从ThreadLocal中拿到当前的resource
+		// 用一个ThreadLocal存放所有编码xml配置资源，避免重复加载相同的资源，set add的时候，如果set存在了需要添加的对象，就会返回false
 		Set<EncodedResource> currentResources = this.resourcesCurrentlyBeingLoaded.get();
 
 		// 将当前的resource添加到currentResources中，如果添加失败，则抛出异常，避免重复加载
@@ -340,7 +340,7 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 					"Detected cyclic loading of " + encodedResource + " - check your import definitions!");
 		}
 
-		// 获取resource的输入流
+		// 获取resource的输入流，创建一个用于xml解析的InputSource，然后开始真正的解析
 		try (InputStream inputStream = encodedResource.getResource().getInputStream()) {
 			//将输入流包装为InputSource，如果设置了编码的话，就给InputSource设置相应的编码
 			InputSource inputSource = new InputSource(inputStream);
@@ -403,9 +403,12 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 
 		try {
 			// 解析inputSource和resource，创建出XML对应的Document对象
+			//Document对象此时是以beans为根节点的spring配置文件的全部内容
 			Document doc = doLoadDocument(inputSource, resource);
+
 			// 解析Document对象，并将解析出来的Bean注册到Spring容器中
 			int count = registerBeanDefinitions(doc, resource);
+
 			// 如果开启了debug，则输出对应的日志
 			if (logger.isDebugEnabled()) {
 				// 打印debug日志：从哪个resource中加载了多少个beanDefinition
@@ -538,9 +541,16 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 	 * @see BeanDefinitionDocumentReader#registerBeanDefinitions
 	 */
 	public int registerBeanDefinitions(Document doc, Resource resource) throws BeanDefinitionStoreException {
+		// 创建一个BeanDefinitionDocumentReader实例,实现文档解析与注册
 		BeanDefinitionDocumentReader documentReader = createBeanDefinitionDocumentReader();
+
+		// 获取BeanDefinitionRegistry实例，再通过此实例获取到容器中已经注册了Bean的数量
 		int countBefore = getRegistry().getBeanDefinitionCount();
+
+		// 通过BeanDefinitionDocumentReader将传入的Document解析，并将解析出来的bean注册到容器中
 		documentReader.registerBeanDefinitions(doc, createReaderContext(resource));
+
+		// 获取到此次操作注入了多少个Bean，通过当前容器bean的数量减去注册前的容器bean数量得到结果。
 		return getRegistry().getBeanDefinitionCount() - countBefore;
 	}
 
@@ -551,6 +561,7 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 	 * @see #setDocumentReaderClass
 	 */
 	protected BeanDefinitionDocumentReader createBeanDefinitionDocumentReader() {
+		// 通过反射的方式创建对象，对象类型为 DefaultBeanDefinitionDocumentReader
 		return BeanUtils.instantiateClass(this.documentReaderClass);
 	}
 

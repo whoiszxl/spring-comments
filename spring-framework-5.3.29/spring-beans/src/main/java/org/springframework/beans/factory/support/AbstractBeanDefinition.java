@@ -54,6 +54,7 @@ import org.springframework.util.StringUtils;
  * @see GenericBeanDefinition
  * @see RootBeanDefinition
  * @see ChildBeanDefinition
+ * AbstractBeanDefinition中保存了部分通用的基础属性
  */
 @SuppressWarnings("serial")
 public abstract class AbstractBeanDefinition extends BeanMetadataAttributeAccessor
@@ -1113,11 +1114,13 @@ public abstract class AbstractBeanDefinition extends BeanMetadataAttributeAccess
 	 * @throws BeanDefinitionValidationException in case of validation failure
 	 */
 	public void validate() throws BeanDefinitionValidationException {
+		// 如果同时存在methodOverrides和factoryMethodName,直接抛出异常
 		if (hasMethodOverrides() && getFactoryMethodName() != null) {
 			throw new BeanDefinitionValidationException(
 					"Cannot combine factory method with container-generated method overrides: " +
 					"the factory method must create the concrete bean instance.");
 		}
+		// 如果存在bean class，则需要预处理这些需要覆盖的方法
 		if (hasBeanClass()) {
 			prepareMethodOverrides();
 		}
@@ -1131,6 +1134,7 @@ public abstract class AbstractBeanDefinition extends BeanMetadataAttributeAccess
 	public void prepareMethodOverrides() throws BeanDefinitionValidationException {
 		// Check that lookup methods exist and determine their overloaded status.
 		if (hasMethodOverrides()) {
+			// for循环依次处理
 			getMethodOverrides().getOverrides().forEach(this::prepareMethodOverride);
 		}
 	}
@@ -1144,15 +1148,21 @@ public abstract class AbstractBeanDefinition extends BeanMetadataAttributeAccess
 	 */
 	protected void prepareMethodOverride(MethodOverride mo) throws BeanDefinitionValidationException {
 		int count = ClassUtils.getMethodCountForName(getBeanClass(), mo.getMethodName());
+		// count为0，说明该类中没有该方法,无法覆盖,抛出异常。
 		if (count == 0) {
 			throw new BeanDefinitionValidationException(
 					"Invalid method override: no method with name '" + mo.getMethodName() +
 					"' on class [" + getBeanClassName() + "]");
 		}
+		// 数量为1,说明方法没有重载,设置为false，表示没有重载，避免后续参数检查的开销。
 		else if (count == 1) {
 			// Mark override as not overloaded, to avoid the overhead of arg type checking.
 			mo.setOverloaded(false);
 		}
+
+		// 数量大于1的话，说明方法存在重载，保留mo里的默认值true
+		//过预先验证被覆盖的方法存在性,并标记是否重载,为后续的方法覆盖应用做准备工作。
+		//这样可以提前发现配置错误,同时如果可以避免不必要的类型检查,可以提升性能。
 	}
 
 

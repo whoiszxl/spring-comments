@@ -21,7 +21,6 @@ public class Monkey implements BeanNameAware, BeanFactoryAware {
 
 	@Override
 	public void setBeanName(@NotNull String beanName) {
-		System.out.println("BeanNameAware注入的beanName:" + beanName);
 		this.beanName = beanName;
 	}
 
@@ -31,5 +30,15 @@ public class Monkey implements BeanNameAware, BeanFactoryAware {
 
 	public String getName() {
 		return name;
+	}
+
+
+	@Override
+	public String toString() {
+		return "Monkey{" +
+				"name='" + name + '\'' +
+				", beanName='" + beanName + '\'' +
+				", beanFactory=" + beanFactory +
+				'}';
 	}
 }

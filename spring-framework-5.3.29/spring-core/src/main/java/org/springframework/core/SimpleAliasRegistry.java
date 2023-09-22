@@ -55,6 +55,7 @@ public class SimpleAliasRegistry implements AliasRegistry {
 		Assert.hasText(name, "'name' must not be empty");
 		Assert.hasText(alias, "'alias' must not be empty");
 		synchronized (this.aliasMap) {
+			// 如果别名和beanName相同，则需要移除
 			if (alias.equals(name)) {
 				this.aliasMap.remove(alias);
 				if (logger.isDebugEnabled()) {
@@ -62,23 +63,31 @@ public class SimpleAliasRegistry implements AliasRegistry {
 				}
 			}
 			else {
+				// 不同则从aliasMap容器里面获取一下beanName是否已经注册了
 				String registeredName = this.aliasMap.get(alias);
 				if (registeredName != null) {
+					// 如果已经存在了就直接返回，禁止注册
 					if (registeredName.equals(name)) {
 						// An existing alias - no need to re-register
 						return;
 					}
+					// 查看是否允许覆盖别名，如果不允许则直接抛出异常
 					if (!allowAliasOverriding()) {
 						throw new IllegalStateException("Cannot define alias '" + alias + "' for name '" +
 								name + "': It is already registered for name '" + registeredName + "'.");
 					}
+					// 打印debug日志
 					if (logger.isDebugEnabled()) {
 						logger.debug("Overriding alias '" + alias + "' definition for registered name '" +
 								registeredName + "' with new target name '" + name + "'");
 					}
 				}
+
+				// 校验别名是否存在循环
 				checkForAliasCircle(name, alias);
+				// 将别名和beanName对应关系注册上去
 				this.aliasMap.put(alias, name);
+				// 打印trace日志，表示alias注册上了
 				if (logger.isTraceEnabled()) {
 					logger.trace("Alias definition '" + alias + "' registered for name '" + name + "'");
 				}
@@ -203,6 +212,8 @@ public class SimpleAliasRegistry implements AliasRegistry {
 	}
 
 	/**
+	 * 通过配置的别名拿到对应的beanName
+	 *
 	 * Determine the raw name, resolving aliases to canonical names.
 	 * @param name the user-specified name
 	 * @return the transformed name
@@ -212,12 +223,14 @@ public class SimpleAliasRegistry implements AliasRegistry {
 		// Handle aliasing...
 		String resolvedName;
 		do {
+			//从别名缓存中拿到对应的实际bean名称，并赋值给canonicalName
 			resolvedName = this.aliasMap.get(canonicalName);
 			if (resolvedName != null) {
 				canonicalName = resolvedName;
 			}
 		}
-		while (resolvedName != null);
+		while (resolvedName != null); //do while循环，当从别名缓存拿不到数据时才中断
+		// 返回最后获取到的beanName
 		return canonicalName;
 	}
 
