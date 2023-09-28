@@ -1,0 +1,25 @@
+<beans xmlns="http://www.springframework.org/schema/beans"
+	   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	   xmlns:aop="http://www.springframework.org/schema/aop"
+	   xsi:schemaLocation="http://www.springframework.org/schema/beans
+                           http://www.springframework.org/schema/beans/spring-beans.xsd
+                           http://www.springframework.org/schema/aop
+                           https://www.springframework.org/schema/aop/spring-aop.xsd">
+
+	<bean id="master" class="com.whoiszxl.entity.cycle.Master">
+		<constructor-arg name="slave" ref="slave"/>
+	</bean>
+
+	<bean id="slave" class="com.whoiszxl.entity.cycle.Slave">
+		<constructor-arg name="master" ref="master"/>
+	</bean>
+
+	<bean id="teacher" class="com.whoiszxl.entity.cycle.Teacher">
+		<property name="student" ref="student"/>
+	</bean>
+
+	<bean id="student" class="com.whoiszxl.entity.cycle.Student">
+		<property name="teacher" ref="teacher"/>
+	</bean>
+
+</beans>

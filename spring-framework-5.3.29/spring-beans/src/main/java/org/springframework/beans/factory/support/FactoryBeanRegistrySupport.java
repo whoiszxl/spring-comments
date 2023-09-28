@@ -94,10 +94,15 @@ public abstract class FactoryBeanRegistrySupport extends DefaultSingletonBeanReg
 	 * @see org.springframework.beans.factory.FactoryBean#getObject()
 	 */
 	protected Object getObjectFromFactoryBean(FactoryBean<?> factory, String beanName, boolean shouldPostProcess) {
+		// 如果FactoryBean是单例，并且singletonObjects一级缓存中存在当前的bean
 		if (factory.isSingleton() && containsSingleton(beanName)) {
+			// 加锁
 			synchronized (getSingletonMutex()) {
+				// 从factoryBean的对象缓存中获取实例对象
 				Object object = this.factoryBeanObjectCache.get(beanName);
+				// 初次访问必定为null
 				if (object == null) {
+					// 所以这一步需要调用实现了FactoryBean接口的对象的getObject方法来创建对应的bean对象
 					object = doGetObjectFromFactoryBean(factory, beanName);
 					// Only post-process and store if not put there already during getObject() call above
 					// (e.g. because of circular reference processing triggered by custom getBean calls)
@@ -107,12 +112,15 @@ public abstract class FactoryBeanRegistrySupport extends DefaultSingletonBeanReg
 					}
 					else {
 						if (shouldPostProcess) {
+							// 判断当前bean是否正在实例化，如果正在实例化，那么直接返回object
 							if (isSingletonCurrentlyInCreation(beanName)) {
 								// Temporarily return non-post-processed object, not storing it yet..
 								return object;
 							}
+							// 将beanName添加到正在创建中的map中，表示单例bean对象正在创建中
 							beforeSingletonCreation(beanName);
 							try {
+								// 后置处理
 								object = postProcessObjectFromFactoryBean(object, beanName);
 							}
 							catch (Throwable ex) {
@@ -120,10 +128,13 @@ public abstract class FactoryBeanRegistrySupport extends DefaultSingletonBeanReg
 										"Post-processing of FactoryBean's singleton object failed", ex);
 							}
 							finally {
+								// 将beanName从创建中的map里移除，表示单例bean对象已经创建完成了
 								afterSingletonCreation(beanName);
 							}
 						}
+						// 如果beanName对应的单例bean存在于单例Map中
 						if (containsSingleton(beanName)) {
+							// 将FactoryBean创建的实例对象添加到缓存中
 							this.factoryBeanObjectCache.put(beanName, object);
 						}
 					}
@@ -166,6 +177,7 @@ public abstract class FactoryBeanRegistrySupport extends DefaultSingletonBeanReg
 				}
 			}
 			else {
+				// 实际上创建FactoryBean对象的地方
 				object = factory.getObject();
 			}
 		}

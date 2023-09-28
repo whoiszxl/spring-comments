@@ -503,9 +503,11 @@ public class RootBeanDefinition extends AbstractBeanDefinition {
 	 */
 	boolean hasAnyExternallyManagedInitMethod(String initMethod) {
 		synchronized (this.postProcessingLock) {
+			// 首先检查是否是外部管理的初始化方法，如果是，直接返回 true
 			if (isExternallyManagedInitMethod(initMethod)) {
 				return true;
 			}
+			// 调用 hasAnyExternallyManagedMethod 方法检查是否存在外部管理的方法
 			return hasAnyExternallyManagedMethod(this.externallyManagedInitMethods, initMethod);
 		}
 	}

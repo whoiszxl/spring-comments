@@ -1,0 +1,22 @@
+<beans xmlns="http://www.springframework.org/schema/beans"
+	   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	   xmlns:aop="http://www.springframework.org/schema/aop"
+	   xsi:schemaLocation="http://www.springframework.org/schema/beans
+                           http://www.springframework.org/schema/beans/spring-beans.xsd
+                           http://www.springframework.org/schema/aop
+                           https://www.springframework.org/schema/aop/spring-aop.xsd">
+
+
+	<bean id="teacher" class="com.whoiszxl.entity.cycle.Teacher" depends-on="student1,student2,student1">
+		<property name="student" ref="student1"/>
+	</bean>
+
+	<bean id="student1" class="com.whoiszxl.entity.cycle.Student">
+		<property name="teacher" ref="teacher"/>
+	</bean>
+
+	<bean id="student2" class="com.whoiszxl.entity.cycle.Student">
+		<property name="teacher" ref="teacher"/>
+	</bean>
+
+</beans>

@@ -114,13 +114,16 @@ public class CglibSubclassingInstantiationStrategy extends SimpleInstantiationSt
 		 * @return new instance of the dynamically generated subclass
 		 */
 		public Object instantiate(@Nullable Constructor<?> ctor, Object... args) {
+			// 创建一个增强的子类
 			Class<?> subclass = createEnhancedSubclass(this.beanDefinition);
 			Object instance;
 			if (ctor == null) {
+				// 构造函数为空，则使用无参构造函数实例化子类
 				instance = BeanUtils.instantiateClass(subclass);
 			}
 			else {
 				try {
+					// 使用传入的构造函数实例化子类
 					Constructor<?> enhancedSubclassConstructor = subclass.getConstructor(ctor.getParameterTypes());
 					instance = enhancedSubclassConstructor.newInstance(args);
 				}
@@ -131,6 +134,8 @@ public class CglibSubclassingInstantiationStrategy extends SimpleInstantiationSt
 			}
 			// SPR-10785: set callbacks directly on the instance instead of in the
 			// enhanced class (via the Enhancer) in order to avoid memory leaks.
+			// 设置回调方法，用于实现查找操作。
+			// lookup-method 和 replace-method
 			Factory factory = (Factory) instance;
 			factory.setCallbacks(new Callback[] {NoOp.INSTANCE,
 					new LookupOverrideMethodInterceptor(this.beanDefinition, this.owner),
@@ -143,15 +148,27 @@ public class CglibSubclassingInstantiationStrategy extends SimpleInstantiationSt
 		 * definition, using CGLIB.
 		 */
 		private Class<?> createEnhancedSubclass(RootBeanDefinition beanDefinition) {
+			// 创建Enhancer对象，用于生成CGLIB子类
 			Enhancer enhancer = new Enhancer();
+
+			// 设置父类，即原始Bean类
 			enhancer.setSuperclass(beanDefinition.getBeanClass());
+
+			// 设置命名策略，这里使用SpringNamingPolicy.INSTANCE，通常是默认策略
 			enhancer.setNamingPolicy(SpringNamingPolicy.INSTANCE);
+
+			// 如果Bean工厂（owner）是ConfigurableBeanFactory类型的，设置类加载器策略
 			if (this.owner instanceof ConfigurableBeanFactory) {
 				ClassLoader cl = ((ConfigurableBeanFactory) this.owner).getBeanClassLoader();
 				enhancer.setStrategy(new ClassLoaderAwareGeneratorStrategy(cl));
 			}
+			// 设置回调过滤器，用于过滤回调方法
 			enhancer.setCallbackFilter(new MethodOverrideCallbackFilter(beanDefinition));
+
+			// 设置回调过滤器，用于过滤回调方法
 			enhancer.setCallbackTypes(CALLBACK_TYPES);
+
+			// 创建并返回CGLIB生成的子类的Class对象
 			return enhancer.createClass();
 		}
 	}

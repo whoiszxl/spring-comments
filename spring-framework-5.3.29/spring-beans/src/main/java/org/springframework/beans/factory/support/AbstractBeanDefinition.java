@@ -67,30 +67,40 @@ public abstract class AbstractBeanDefinition extends BeanMetadataAttributeAccess
 	public static final String SCOPE_DEFAULT = "";
 
 	/**
+	 * 默认的模式：不进行自动装配
+	 *
 	 * Constant that indicates no external autowiring at all.
 	 * @see #setAutowireMode
 	 */
 	public static final int AUTOWIRE_NO = AutowireCapableBeanFactory.AUTOWIRE_NO;
 
 	/**
+	 * 通过名称进行自动装配
+	 *
 	 * Constant that indicates autowiring bean properties by name.
 	 * @see #setAutowireMode
 	 */
 	public static final int AUTOWIRE_BY_NAME = AutowireCapableBeanFactory.AUTOWIRE_BY_NAME;
 
 	/**
+	 * 通过类型进行自动装配
+	 *
 	 * Constant that indicates autowiring bean properties by type.
 	 * @see #setAutowireMode
 	 */
 	public static final int AUTOWIRE_BY_TYPE = AutowireCapableBeanFactory.AUTOWIRE_BY_TYPE;
 
 	/**
+	 * 通过构造方法自动装配
+	 *
 	 * Constant that indicates autowiring a constructor.
 	 * @see #setAutowireMode
 	 */
 	public static final int AUTOWIRE_CONSTRUCTOR = AutowireCapableBeanFactory.AUTOWIRE_CONSTRUCTOR;
 
 	/**
+	 * Spring自动探测装配模式
+	 *
 	 * Constant that indicates determining an appropriate autowire strategy
 	 * through introspection of the bean class.
 	 * @see #setAutowireMode
@@ -467,6 +477,7 @@ public abstract class AbstractBeanDefinition extends BeanMetadataAttributeAccess
 		if (className == null) {
 			return null;
 		}
+		// 实际解析class的地方
 		Class<?> resolvedClass = ClassUtils.forName(className, classLoader);
 		this.beanClass = resolvedClass;
 		return resolvedClass;
@@ -612,15 +623,21 @@ public abstract class AbstractBeanDefinition extends BeanMetadataAttributeAccess
 			// Work out whether to apply setter autowiring or constructor autowiring.
 			// If it has a no-arg constructor it's deemed to be setter autowiring,
 			// otherwise we'll try constructor autowiring.
+
+			// 如果自动装配模式为AUTOWIRE_AUTODETECT 自动探测
+			// 则根据Bean类的构造函数判断是否应用构造函数自动装配或按类型自动装配
 			Constructor<?>[] constructors = getBeanClass().getConstructors();
 			for (Constructor<?> constructor : constructors) {
 				if (constructor.getParameterCount() == 0) {
+					// 如果存在无参数构造函数，则选择按类型自动装配
 					return AUTOWIRE_BY_TYPE;
 				}
 			}
+			// 如果没有无参数构造函数，则选择构造函数自动装配
 			return AUTOWIRE_CONSTRUCTOR;
 		}
 		else {
+			// 如果自动装配模式不是AUTOWIRE_AUTODETECT，则返回原始模式
 			return this.autowireMode;
 		}
 	}

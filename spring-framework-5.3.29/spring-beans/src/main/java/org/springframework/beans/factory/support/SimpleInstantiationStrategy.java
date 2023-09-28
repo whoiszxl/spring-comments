@@ -60,23 +60,35 @@ public class SimpleInstantiationStrategy implements InstantiationStrategy {
 	@Override
 	public Object instantiate(RootBeanDefinition bd, @Nullable String beanName, BeanFactory owner) {
 		// Don't override the class with CGLIB if no overrides.
+
+		// 检查是否存在Bean定义中的方法重写（MethodOverrides）。
+		// 如果Bean定义中没有方法重写，表示不需要使用CGLIB动态生成子类。
 		if (!bd.hasMethodOverrides()) {
 			Constructor<?> constructorToUse;
 			synchronized (bd.constructorArgumentLock) {
+				// 从Bean定义中获取已解析的构造函数或工厂方法
 				constructorToUse = (Constructor<?>) bd.resolvedConstructorOrFactoryMethod;
+
+				// 如果不存在
 				if (constructorToUse == null) {
+					// 获取Bean定义中的Bean Class
 					final Class<?> clazz = bd.getBeanClass();
+
+					// 如果Bean类是一个接口，抛出异常，表示接口不能被实例化
 					if (clazz.isInterface()) {
 						throw new BeanInstantiationException(clazz, "Specified class is an interface");
 					}
 					try {
 						if (System.getSecurityManager() != null) {
+							// 如果有安全管理器，则通过AccessController来获取Bean的默认构造函数
 							constructorToUse = AccessController.doPrivileged(
 									(PrivilegedExceptionAction<Constructor<?>>) clazz::getDeclaredConstructor);
 						}
 						else {
+							// 获取默认构造函数
 							constructorToUse = clazz.getDeclaredConstructor();
 						}
+						// 将找到的构造函数设置为已解析的构造函数或工厂方法
 						bd.resolvedConstructorOrFactoryMethod = constructorToUse;
 					}
 					catch (Throwable ex) {
@@ -84,10 +96,12 @@ public class SimpleInstantiationStrategy implements InstantiationStrategy {
 					}
 				}
 			}
+			// 使用找到的构造函数实例化Bean对象，并返回实例化的结果
 			return BeanUtils.instantiateClass(constructorToUse);
 		}
 		else {
 			// Must generate CGLIB subclass.
+			// 如果存在方法重写，则生成CGLIB子类并实例化Bean对象
 			return instantiateWithMethodInjection(bd, beanName, owner);
 		}
 	}
@@ -138,6 +152,8 @@ public class SimpleInstantiationStrategy implements InstantiationStrategy {
 			@Nullable Object factoryBean, final Method factoryMethod, Object... args) {
 
 		try {
+			// 判断检查是否存在安全管理器。如果存在安全管理器，表示应用程序运行在安全环境中，
+			// 将通过AccessController.doPrivileged来执行后续的代码块
 			if (System.getSecurityManager() != null) {
 				AccessController.doPrivileged((PrivilegedAction<Object>) () -> {
 					ReflectionUtils.makeAccessible(factoryMethod);
@@ -145,12 +161,16 @@ public class SimpleInstantiationStrategy implements InstantiationStrategy {
 				});
 			}
 			else {
+				// 通过反射工具类设置 factoryMethod 的访问权限为可以访问
 				ReflectionUtils.makeAccessible(factoryMethod);
 			}
 
+			// 获取当前正在调用的工厂方法
 			Method priorInvokedFactoryMethod = currentlyInvokedFactoryMethod.get();
 			try {
+				// 设置当前正在调用的工厂方法
 				currentlyInvokedFactoryMethod.set(factoryMethod);
+				// invoke调用工厂方法
 				Object result = factoryMethod.invoke(factoryBean, args);
 				if (result == null) {
 					result = new NullBean();

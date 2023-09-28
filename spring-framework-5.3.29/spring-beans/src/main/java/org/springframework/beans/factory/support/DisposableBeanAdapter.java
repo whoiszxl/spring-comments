@@ -210,6 +210,7 @@ class DisposableBeanAdapter implements DisposableBean, Runnable, Serializable {
 					}, this.acc);
 				}
 				else {
+					// 执行bean的销毁方法
 					((DisposableBean) this.bean).destroy();
 				}
 			}

@@ -34,6 +34,10 @@ package org.springframework.beans.factory;
 public interface InitializingBean {
 
 	/**
+	 *
+	 * 在 Spring 容器设置了所有 Bean 属性并满足了一些特殊接口（如 BeanFactoryAware、ApplicationContextAware 等）
+	 * 之后由容器调用。
+	 *
 	 * Invoked by the containing {@code BeanFactory} after it has set all bean properties
 	 * and satisfied {@link BeanFactoryAware}, {@code ApplicationContextAware} etc.
 	 * <p>This method allows the bean instance to perform validation of its overall

@@ -394,6 +394,7 @@ class ConstructorResolver {
 	public BeanWrapper instantiateUsingFactoryMethod(
 			String beanName, RootBeanDefinition mbd, @Nullable Object[] explicitArgs) {
 
+		// 创建一个bean包装对象，用于后续包装实例化的bean
 		BeanWrapperImpl bw = new BeanWrapperImpl();
 		this.beanFactory.initBeanWrapper(bw);
 
@@ -401,7 +402,10 @@ class ConstructorResolver {
 		Class<?> factoryClass;
 		boolean isStatic;
 
+		// 拿到工厂的bean名称 factoryBeanName
 		String factoryBeanName = mbd.getFactoryBeanName();
+
+		// 如果工厂bean存在，则通过工厂bean进行实例化
 		if (factoryBeanName != null) {
 			if (factoryBeanName.equals(beanName)) {
 				throw new BeanDefinitionStoreException(mbd.getResourceDescription(), beanName,
@@ -417,45 +421,67 @@ class ConstructorResolver {
 		}
 		else {
 			// It's a static factory method on the bean class.
+			// factoryBeanName不存在，则通过静态工厂方法来创建bean
+
+			// 判断是否存在bean的class类型，不存在则抛出异常
 			if (!mbd.hasBeanClass()) {
 				throw new BeanDefinitionStoreException(mbd.getResourceDescription(), beanName,
 						"bean definition declares neither a bean class nor a factory-bean reference");
 			}
 			factoryBean = null;
+			// 拿到工厂生成的类的类型
 			factoryClass = mbd.getBeanClass();
+			// 标识是静态类型
 			isStatic = true;
 		}
 
+		// 最终选择的工厂方法
 		Method factoryMethodToUse = null;
+		// 参数的包装对象
 		ArgumentsHolder argsHolderToUse = null;
+		// 实际要传递给工厂方法的参数值
 		Object[] argsToUse = null;
 
+		// 如果传入的参数不为空，则对argsToUse参数进行赋值
 		if (explicitArgs != null) {
 			argsToUse = explicitArgs;
 		}
 		else {
+			// 根据bean定义里的信息来确定参数
 			Object[] argsToResolve = null;
+			// 上锁
 			synchronized (mbd.constructorArgumentLock) {
+				// 尝试获取已解析的构造函数或工厂方法
 				factoryMethodToUse = (Method) mbd.resolvedConstructorOrFactoryMethod;
+				// 如果已经存在缓存的工厂方法且参数也已解析
 				if (factoryMethodToUse != null && mbd.constructorArgumentsResolved) {
 					// Found a cached factory method...
+					// 则直接从缓存中获取参数值
 					argsToUse = mbd.resolvedConstructorArguments;
+					// 如果resolvedConstructorArguments种没有参数，
+					// 就从preparedConstructorArguments中拿到参数赋值给argsToResolve
 					if (argsToUse == null) {
 						argsToResolve = mbd.preparedConstructorArguments;
 					}
 				}
 			}
+			// 进一步解析预备参数，并将解析的结果分配给argsToUse
 			if (argsToResolve != null) {
 				argsToUse = resolvePreparedArguments(beanName, mbd, bw, factoryMethodToUse, argsToResolve);
 			}
 		}
 
+		// 如果工厂方法不存在，或者参数不存在
 		if (factoryMethodToUse == null || argsToUse == null) {
 			// Need to determine the factory method...
 			// Try all methods with this name to see if they match the given arguments.
+			// 确保获取的是用户定义的类而不是CGLIB代理
 			factoryClass = ClassUtils.getUserClass(factoryClass);
 
+			// 方法候选列表，用于存储可能的工厂方法
 			List<Method> candidates = null;
+
+			// 如果bean定义中指定了要使用的工厂方法，则需要调用指定的唯一的工厂方法。参考：{@link org.springframework.beans.factory.support.RootBeanDefinition.setUniqueFactoryMethodName}
 			if (mbd.isFactoryMethodUnique) {
 				if (factoryMethodToUse == null) {
 					factoryMethodToUse = mbd.getResolvedFactoryMethod();
@@ -464,25 +490,40 @@ class ConstructorResolver {
 					candidates = Collections.singletonList(factoryMethodToUse);
 				}
 			}
+			// 如果没有明确的工厂方法，需要进一步寻找合适的候选方法
 			if (candidates == null) {
 				candidates = new ArrayList<>();
+				// 拿到这个工厂类下面的所有的方法
 				Method[] rawCandidates = getCandidateMethods(factoryClass, mbd);
 				for (Method candidate : rawCandidates) {
+					// 循环遍历，找到方法必须是静态的，并且方法是在BeanDefinition中被定义为factory-method方法的
 					if (Modifier.isStatic(candidate.getModifiers()) == isStatic && mbd.isFactoryMethod(candidate)) {
 						candidates.add(candidate);
 					}
 				}
 			}
 
+			// 如果候选方法列表的大小为1 && 参数不存在 && bean定义对象没有构造函数参数值
 			if (candidates.size() == 1 && explicitArgs == null && !mbd.hasConstructorArgumentValues()) {
+				// 从候选方法列表中拿到唯一的方法
 				Method uniqueCandidate = candidates.get(0);
+				// 检查唯一方法是否没有参数，没有参数则进入此 if 分支
 				if (uniqueCandidate.getParameterCount() == 0) {
+					// 将此唯一方法赋值给 mbd 中的 factoryMethodToIntrospect 字段，以便后续的内省操作使用。
 					mbd.factoryMethodToIntrospect = uniqueCandidate;
+
+					// 上锁，保证多线程环境下安全访问
 					synchronized (mbd.constructorArgumentLock) {
+						// 将这个唯一的方法赋值给 mbd 中的 resolvedConstructorOrFactoryMethod 字段，表示这是已解析的构造方法或工厂方法
 						mbd.resolvedConstructorOrFactoryMethod = uniqueCandidate;
+						// 设置为 true，表示构造方法参数已解析
 						mbd.constructorArgumentsResolved = true;
+						// 将一个空的参数数组赋值给 mbd 中的 resolvedConstructorArguments 字段
+						// 表示构造方法不存在参数
 						mbd.resolvedConstructorArguments = EMPTY_ARGS;
 					}
+
+					// 使用工厂方法 uniqueCandidate 创建一个新的实例，并将其设置为 bw 中的 bean 实例。
 					bw.setBeanInstance(instantiate(beanName, mbd, factoryBean, uniqueCandidate, EMPTY_ARGS));
 					return bw;
 				}
@@ -643,6 +684,7 @@ class ConstructorResolver {
 			@Nullable Object factoryBean, Method factoryMethod, Object[] args) {
 
 		try {
+			// 如果存在安全管理器的逻辑
 			if (System.getSecurityManager() != null) {
 				return AccessController.doPrivileged((PrivilegedAction<Object>) () ->
 						this.beanFactory.getInstantiationStrategy().instantiate(
@@ -650,6 +692,8 @@ class ConstructorResolver {
 						this.beanFactory.getAccessControlContext());
 			}
 			else {
+				// 没有存在安全管理器的逻辑
+				// 调用实例化策略直接实例化对象
 				return this.beanFactory.getInstantiationStrategy().instantiate(
 						mbd, beanName, this.beanFactory, factoryBean, factoryMethod, args);
 			}

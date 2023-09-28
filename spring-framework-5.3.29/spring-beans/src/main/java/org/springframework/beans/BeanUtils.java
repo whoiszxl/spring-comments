@@ -191,16 +191,27 @@ public abstract class BeanUtils {
 	public static <T> T instantiateClass(Constructor<T> ctor, Object... args) throws BeanInstantiationException {
 		Assert.notNull(ctor, "Constructor must not be null");
 		try {
+			// 使构造函数可访问（如果不可访问的话）
 			ReflectionUtils.makeAccessible(ctor);
+
+			// 如果是Kotlin类并且支持可选参数和默认值，则使用KotlinDelegate处理
 			if (KotlinDetector.isKotlinReflectPresent() && KotlinDetector.isKotlinType(ctor.getDeclaringClass())) {
 				return KotlinDelegate.instantiateClass(ctor, args);
 			}
 			else {
+				// 获取构造函数的参数类型
 				Class<?>[] parameterTypes = ctor.getParameterTypes();
+
+				// 断言传入的参数长度不大于构造函数参数长度
 				Assert.isTrue(args.length <= parameterTypes.length, "Can't specify more arguments than constructor parameters");
+
+				// 断言传入的参数长度不大于构造函数参数长度
 				Object[] argsWithDefaultValues = new Object[args.length];
+
+				// 遍历传入的参数数组
 				for (int i = 0 ; i < args.length; i++) {
 					if (args[i] == null) {
+						// 如果参数为null，则根据参数类型判断是否为基本数据类型，并设置默认值
 						Class<?> parameterType = parameterTypes[i];
 						argsWithDefaultValues[i] = (parameterType.isPrimitive() ? DEFAULT_TYPE_VALUES.get(parameterType) : null);
 					}
@@ -208,6 +219,7 @@ public abstract class BeanUtils {
 						argsWithDefaultValues[i] = args[i];
 					}
 				}
+				// 使用构造函数和参数值数组来实例化对象
 				return ctor.newInstance(argsWithDefaultValues);
 			}
 		}
