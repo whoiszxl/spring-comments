@@ -66,8 +66,12 @@ public class AnnotationConfigApplicationContext extends GenericApplicationContex
 	 */
 	public AnnotationConfigApplicationContext() {
 		StartupStep createAnnotatedBeanDefReader = this.getApplicationStartup().start("spring.context.annotated-bean-reader.create");
+
+		// 创建一个用于读取注解配置的读取器，它负责解析和处理带有注解的类，将它们转化为Spring的Bean定义
 		this.reader = new AnnotatedBeanDefinitionReader(this);
 		createAnnotatedBeanDefReader.end();
+
+		// 创建一个用于扫描类路径下的组件类，并将它们注册为Spring的Bean定义
 		this.scanner = new ClassPathBeanDefinitionScanner(this);
 	}
 
@@ -100,8 +104,14 @@ public class AnnotationConfigApplicationContext extends GenericApplicationContex
 	 * @param basePackages the packages to scan for component classes
 	 */
 	public AnnotationConfigApplicationContext(String... basePackages) {
+		// 创建当前对象，并且初始化配置读取工具和注解扫描工具
 		this();
+
+		// 接受一个或多个包名作为参数，用于扫描指定包中的组件类， 组件类为带有特定注解的类，
+		// 如 @Component、@Service、@Repository 等，并为这些组件类注册相应的Bean定义
 		scan(basePackages);
+
+		// 触发应用程序上下文的刷新过程，包括加载Bean定义、实例化Bean、依赖注入等
 		refresh();
 	}
 
@@ -182,7 +192,10 @@ public class AnnotationConfigApplicationContext extends GenericApplicationContex
 		Assert.notEmpty(basePackages, "At least one base package must be specified");
 		StartupStep scanPackages = this.getApplicationStartup().start("spring.context.base-packages.scan")
 				.tag("packages", () -> Arrays.toString(basePackages));
+
+		// 通过上一步创建的扫描器进行扫描
 		this.scanner.scan(basePackages);
+
 		scanPackages.end();
 	}
 

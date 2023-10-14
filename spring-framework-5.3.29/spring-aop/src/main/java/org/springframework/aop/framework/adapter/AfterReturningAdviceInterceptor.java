@@ -54,7 +54,11 @@ public class AfterReturningAdviceInterceptor implements MethodInterceptor, After
 	@Override
 	@Nullable
 	public Object invoke(MethodInvocation mi) throws Throwable {
+		// @AfterReturning 增强方法执行前，还有其他的增强方法需要执行，所以先继续往下执行
+		// 没有 catch 异常，如果发生异常后不会执行 @AfterReturning 增强方法
 		Object retVal = mi.proceed();
+
+		// 再执行 @AfterReturning 增强的方法
 		this.advice.afterReturning(retVal, mi.getMethod(), mi.getArguments(), mi.getThis());
 		return retVal;
 	}

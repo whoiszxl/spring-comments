@@ -61,10 +61,13 @@ public class AspectJAfterThrowingAdvice extends AbstractAspectJAdvice
 	@Nullable
 	public Object invoke(MethodInvocation mi) throws Throwable {
 		try {
+			// @AfterThrowing 增强方法业务执行
 			return mi.proceed();
 		}
 		catch (Throwable ex) {
+			// 判断异常是否是给定类型的异常
 			if (shouldInvokeOnThrowing(ex)) {
+				// 执行 @AfterThrowing 增强方法，必须发生了异常才会执行
 				invokeAdviceMethod(getJoinPointMatch(), null, ex);
 			}
 			throw ex;

@@ -155,34 +155,61 @@ public class ReflectiveMethodInvocation implements ProxyMethodInvocation, Clonea
 	}
 
 
+	/**
+	 * 调用顺序
+	 * 1. @Around -> AspectJAroundAdvice
+	 *
+	 * 2. @Before -> MethodBeforeAdviceInterceptor
+	 *
+	 * 3. 目标方法
+	 *
+	 * 4. @Around -> AspectJAroundAdvice
+	 *
+	 * 5. @After -> AspectJAfterAdvice
+	 *
+	 * 6. @AfterReturning -> AfterReturningAdviceInterceptor
+	 *
+	 * 7. @AfterThrowing -> AspectJAfterThrowingAdvice
+	 *
+	 */
 	@Override
 	@Nullable
 	public Object proceed() throws Throwable {
 		// We start with an index of -1 and increment early.
+		// currentInterceptorIndex 表示当前拦截器链中的索引，初始值为 -1
+		// 检查当前拦截器索引是否达到拦截器链的末尾。如果已经到达末尾，说明所有拦截器已经执行完毕
 		if (this.currentInterceptorIndex == this.interceptorsAndDynamicMethodMatchers.size() - 1) {
+			// 执行完毕后调用 invokeJoinpoint() 方法来执行实际的目标方法
 			return invokeJoinpoint();
 		}
 
+		// 从拦截器链中获取下一个拦截器或拦截适配器
 		Object interceptorOrInterceptionAdvice =
 				this.interceptorsAndDynamicMethodMatchers.get(++this.currentInterceptorIndex);
+
+		// 检查获取的对象是否是 InterceptorAndDynamicMethodMatcher 类型的，这表示它是一个动态方法匹配器
 		if (interceptorOrInterceptionAdvice instanceof InterceptorAndDynamicMethodMatcher) {
 			// Evaluate dynamic method matcher here: static part will already have
 			// been evaluated and found to match.
-			InterceptorAndDynamicMethodMatcher dm =
-					(InterceptorAndDynamicMethodMatcher) interceptorOrInterceptionAdvice;
+
+			// 使用动态方法匹配器检查当前方法是否匹配
+			InterceptorAndDynamicMethodMatcher dm = (InterceptorAndDynamicMethodMatcher) interceptorOrInterceptionAdvice;
 			Class<?> targetClass = (this.targetClass != null ? this.targetClass : this.method.getDeclaringClass());
 			if (dm.methodMatcher.matches(this.method, targetClass, this.arguments)) {
+				// 执行拦截逻辑
 				return dm.interceptor.invoke(this);
 			}
 			else {
 				// Dynamic matching failed.
 				// Skip this interceptor and invoke the next in the chain.
+				// 跳过当前拦截器，继续执行下一个拦截器
 				return proceed();
 			}
 		}
 		else {
 			// It's an interceptor, so we just invoke it: The pointcut will have
 			// been evaluated statically before this object was constructed.
+			// 普通的拦截器，直接执行拦截逻辑
 			return ((MethodInterceptor) interceptorOrInterceptionAdvice).invoke(this);
 		}
 	}

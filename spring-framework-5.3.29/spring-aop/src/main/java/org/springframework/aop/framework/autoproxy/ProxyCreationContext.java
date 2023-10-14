@@ -53,6 +53,7 @@ public final class ProxyCreationContext {
 	 */
 	static void setCurrentProxiedBeanName(@Nullable String beanName) {
 		if (beanName != null) {
+			// 通过 currentProxiedBeanName 这个线程局部变量（ThreadLocal）来存储当前代理的 Bean 名称
 			currentProxiedBeanName.set(beanName);
 		}
 		else {

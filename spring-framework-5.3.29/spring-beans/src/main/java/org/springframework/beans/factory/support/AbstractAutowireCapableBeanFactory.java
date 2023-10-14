@@ -1505,6 +1505,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 			for (InstantiationAwareBeanPostProcessor bp : getBeanPostProcessorCache().instantiationAware) {
 
 				// 调用 postProcessProperties 来进一步处理属性值，这个方法用来修改、调整或者替换属性值。
+				// 比如说加了 @Autowired 注解的属性便需要注入
 				PropertyValues pvsToUse = bp.postProcessProperties(pvs, bw.getWrappedInstance(), beanName);
 				if (pvsToUse == null) {
 					if (filteredPds == null) {

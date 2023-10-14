@@ -55,33 +55,46 @@ public class DefaultAdvisorAdapterRegistry implements AdvisorAdapterRegistry, Se
 
 	@Override
 	public Advisor wrap(Object adviceObject) throws UnknownAdviceTypeException {
+		// 已是 Advisor 则直接返回
 		if (adviceObject instanceof Advisor) {
 			return (Advisor) adviceObject;
 		}
+		// 非 Advisor 亦非 Advice，直接抛出异常
 		if (!(adviceObject instanceof Advice)) {
 			throw new UnknownAdviceTypeException(adviceObject);
 		}
+		// 为 Advice 类型，则判断是否是 MethodInterceptor，若是则包装为 DefaultPointcutAdvisor 返回
 		Advice advice = (Advice) adviceObject;
 		if (advice instanceof MethodInterceptor) {
 			// So well-known it doesn't even need an adapter.
 			return new DefaultPointcutAdvisor(advice);
 		}
+
+		// 通过适配器检查后判断是否返回
 		for (AdvisorAdapter adapter : this.adapters) {
 			// Check that it is supported.
 			if (adapter.supportsAdvice(advice)) {
 				return new DefaultPointcutAdvisor(advice);
 			}
 		}
+
+		// 抛出异常
 		throw new UnknownAdviceTypeException(advice);
 	}
 
 	@Override
 	public MethodInterceptor[] getInterceptors(Advisor advisor) throws UnknownAdviceTypeException {
 		List<MethodInterceptor> interceptors = new ArrayList<>(3);
+		// 获取切面中的增强方法
 		Advice advice = advisor.getAdvice();
+
+		// 如果 advice 是 MethodInterceptor 类型，则直接添加进去
+		// 也就是 Around, After 和 AfterThrowing
 		if (advice instanceof MethodInterceptor) {
 			interceptors.add((MethodInterceptor) advice);
 		}
+
+		// 此处将 Before，AfterReturning 通过包装成 MethodInterceptor 后添加进去
 		for (AdvisorAdapter adapter : this.adapters) {
 			if (adapter.supportsAdvice(advice)) {
 				interceptors.add(adapter.getInterceptor(advisor));

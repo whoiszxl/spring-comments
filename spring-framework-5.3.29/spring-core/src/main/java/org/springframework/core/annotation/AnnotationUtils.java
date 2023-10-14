@@ -130,7 +130,9 @@ public abstract class AnnotationUtils {
 	 * @see #isCandidateClass(Class, String)
 	 */
 	public static boolean isCandidateClass(Class<?> clazz, Collection<Class<? extends Annotation>> annotationTypes) {
+		// 遍历初始化的三个注解：[Autowired, Value, Inject]
 		for (Class<? extends Annotation> annotationType : annotationTypes) {
+			// 找到符合条件的，直接返回 true
 			if (isCandidateClass(clazz, annotationType)) {
 				return true;
 			}
@@ -165,6 +167,7 @@ public abstract class AnnotationUtils {
 	 * @see #isCandidateClass(Class, Class)
 	 */
 	public static boolean isCandidateClass(Class<?> clazz, String annotationName) {
+		// 如果注解是以 java. 开头，则直接返回 true
 		if (annotationName.startsWith("java.")) {
 			return true;
 		}

@@ -116,6 +116,7 @@ public class InjectionMetadata {
 				(checkedElements != null ? checkedElements : this.injectedElements);
 		if (!elementsToIterate.isEmpty()) {
 			for (InjectedElement element : elementsToIterate) {
+				// 注入
 				element.inject(target, beanName, pvs);
 			}
 		}
@@ -157,6 +158,7 @@ public class InjectionMetadata {
 	 * @see #needsRefresh(Class)
 	 */
 	public static boolean needsRefresh(@Nullable InjectionMetadata metadata, Class<?> clazz) {
+		// 如果元数据为 null 或者 元数据的类型不一致
 		return (metadata == null || metadata.needsRefresh(clazz));
 	}
 
@@ -221,7 +223,6 @@ public class InjectionMetadata {
 		 */
 		protected void inject(Object target, @Nullable String requestingBeanName, @Nullable PropertyValues pvs)
 				throws Throwable {
-
 			if (this.isField) {
 				Field field = (Field) this.member;
 				ReflectionUtils.makeAccessible(field);

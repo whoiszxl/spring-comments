@@ -139,6 +139,7 @@ final class InstantiationModelAwarePointcutAdvisorImpl
 	 */
 	@Override
 	public synchronized Advice getAdvice() {
+		// 获取实例化的 advice，如果不存在就创建一个 advice 对象
 		if (this.instantiatedAdvice == null) {
 			this.instantiatedAdvice = instantiateAdvice(this.declaredPointcut);
 		}

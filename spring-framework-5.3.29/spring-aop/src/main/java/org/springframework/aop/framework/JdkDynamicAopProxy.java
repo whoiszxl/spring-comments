@@ -80,7 +80,10 @@ final class JdkDynamicAopProxy implements AopProxy, InvocationHandler, Serializa
 	/** We use a static Log to avoid serialization issues. */
 	private static final Log logger = LogFactory.getLog(JdkDynamicAopProxy.class);
 
-	/** Config used to configure this proxy. */
+	/**
+	 * Config used to configure this proxy.
+	 * 存储了关于代理的所有配置信息，在invoke调用中，其为 ProxyFactory
+	 * */
 	private final AdvisedSupport advised;
 
 	private final Class<?>[] proxiedInterfaces;
@@ -108,6 +111,7 @@ final class JdkDynamicAopProxy implements AopProxy, InvocationHandler, Serializa
 			throw new AopConfigException("No advisors and no TargetSource specified");
 		}
 		this.advised = config;
+		// 初始化需要代理的所有接口
 		this.proxiedInterfaces = AopProxyUtils.completeProxiedInterfaces(this.advised, true);
 		findDefinedEqualsAndHashCodeMethods(this.proxiedInterfaces);
 	}
@@ -123,6 +127,7 @@ final class JdkDynamicAopProxy implements AopProxy, InvocationHandler, Serializa
 		if (logger.isTraceEnabled()) {
 			logger.trace("Creating JDK dynamic proxy: " + this.advised.getTargetSource());
 		}
+		// 创建一个JDK动态代理的实例对象
 		return Proxy.newProxyInstance(determineClassLoader(classLoader), this.proxiedInterfaces, this);
 	}
 
@@ -179,6 +184,10 @@ final class JdkDynamicAopProxy implements AopProxy, InvocationHandler, Serializa
 	 * Implementation of {@code InvocationHandler.invoke}.
 	 * <p>Callers will see exactly the exception thrown by the target,
 	 * unless a hook method throws an exception.
+	 *
+	 * proxy: $Proxy32 代理对象自身
+	 * method: 目标类的方法，由代理对象调用
+	 * args: 方法参数
 	 */
 	@Override
 	@Nullable
@@ -190,18 +199,22 @@ final class JdkDynamicAopProxy implements AopProxy, InvocationHandler, Serializa
 		Object target = null;
 
 		try {
+			// 如果目标接口没有定义 equals 方法，并且当前调用的方法是 equals 方法，则调用代理对象的 equals 方法
 			if (!this.equalsDefined && AopUtils.isEqualsMethod(method)) {
 				// The target does not implement the equals(Object) method itself.
 				return equals(args[0]);
 			}
+			// 如果目标接口没有定义 hashCode 方法，并且当前调用的方法是 hashCode 方法，则调用代理对象的 hashCode 方法
 			else if (!this.hashCodeDefined && AopUtils.isHashCodeMethod(method)) {
 				// The target does not implement the hashCode() method itself.
 				return hashCode();
 			}
+			// 如果方法的声明类是 DecoratingProxy
 			else if (method.getDeclaringClass() == DecoratingProxy.class) {
 				// There is only getDecoratedClass() declared -> dispatch to proxy config.
 				return AopProxyUtils.ultimateTargetClass(this.advised);
 			}
+			// 如果方法的声明类是接口，并且声明类是 Advised 类型的，则直接反射调用
 			else if (!this.advised.opaque && method.getDeclaringClass().isInterface() &&
 					method.getDeclaringClass().isAssignableFrom(Advised.class)) {
 				// Service invocations on ProxyConfig with the proxy config...
@@ -210,6 +223,7 @@ final class JdkDynamicAopProxy implements AopProxy, InvocationHandler, Serializa
 
 			Object retVal;
 
+			// 如果 exposeProxy 属性为真，表示开启了代理暴露，即可以通过 AopContext 访问当前代理对象
 			if (this.advised.exposeProxy) {
 				// Make invocation available if necessary.
 				oldProxy = AopContext.setCurrentProxy(proxy);
@@ -218,43 +232,56 @@ final class JdkDynamicAopProxy implements AopProxy, InvocationHandler, Serializa
 
 			// Get as late as possible to minimize the time we "own" the target,
 			// in case it comes from a pool.
+			// 获取目标类对象和目标类的class
 			target = targetSource.getTarget();
 			Class<?> targetClass = (target != null ? target.getClass() : null);
 
 			// Get the interception chain for this method.
+			// 获取当前方法的拦截链，拦截链是一系列拦截器和动态拦截通知（advice）的集合，这些拦截器和通知会在方法调用过程中执行。
 			List<Object> chain = this.advised.getInterceptorsAndDynamicInterceptionAdvice(method, targetClass);
 
 			// Check whether we have any advice. If we don't, we can fall back on direct
 			// reflective invocation of the target, and avoid creating a MethodInvocation.
+			// 如果获取到的拦截器链为空，也就是说没有增强的方法存在，所以直接调用目标对象的业务方法就完事了
 			if (chain.isEmpty()) {
 				// We can skip creating a MethodInvocation: just invoke the target directly
 				// Note that the final invoker must be an InvokerInterceptor so we know it does
 				// nothing but a reflective operation on the target, and no hot swapping or fancy proxying.
 				Object[] argsToUse = AopProxyUtils.adaptArgumentsIfNecessary(method, args);
+				// 代理对象直接反射调用目标对象的方法
 				retVal = AopUtils.invokeJoinpointUsingReflection(target, method, argsToUse);
 			}
 			else {
 				// We need to create a method invocation...
-				MethodInvocation invocation =
-						new ReflectiveMethodInvocation(proxy, target, method, args, targetClass, chain);
-				// Proceed to the joinpoint through the interceptor chain.
+				// 如果存在拦截器或通知，代理对象会创建一个 MethodInvocation 对象，
+				// 其中包含了代理对象、目标对象、目标方法、方法参数、目标类和拦截器链信息。
+				MethodInvocation invocation = new ReflectiveMethodInvocation(proxy, target, method, args, targetClass, chain);
+				// Proceed to the joinPoint through the interceptor chain.
+				// 拦截器依次执行，此处会按照顺序依次执行代码的增强逻辑和业务逻辑
 				retVal = invocation.proceed();
 			}
 
 			// Massage return value if necessary.
+			// 获取到返回值的 class
 			Class<?> returnType = method.getReturnType();
+			// 如果返回值不为空，且与目标对象 target 相同，并且返回值类型不是 Object 类型，并且返回值类型与代理对象 proxy 具有相同的类型
+			// 并且当前方法的声明类不是 RawTargetAccess 类的子类
 			if (retVal != null && retVal == target &&
 					returnType != Object.class && returnType.isInstance(proxy) &&
 					!RawTargetAccess.class.isAssignableFrom(method.getDeclaringClass())) {
 				// Special case: it returned "this" and the return type of the method
 				// is type-compatible. Note that we can't help if the target sets
 				// a reference to itself in another returned object.
+				// 那么它将 retVal 设置为代理对象 proxy
 				retVal = proxy;
 			}
+			// 如果 retVal 为空（null），并且返回类型 returnType 不是 void 或基本数据类型，
+			// 那么它会抛出 AopInvocationException 异常，表示通知方法的返回值与目标方法的返回类型不匹配。
 			else if (retVal == null && returnType != Void.TYPE && returnType.isPrimitive()) {
 				throw new AopInvocationException(
 						"Null return value from advice does not match primitive return type for: " + method);
 			}
+			// 返回结果
 			return retVal;
 		}
 		finally {

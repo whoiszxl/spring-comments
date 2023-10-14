@@ -288,8 +288,11 @@ public abstract class AbstractAutoProxyCreator extends ProxyProcessorSupport
 	@Override
 	public Object postProcessAfterInitialization(@Nullable Object bean, String beanName) {
 		if (bean != null) {
+			// 获取到缓存key，工厂Bean则为：&+beanName，否则直接为 beanName
 			Object cacheKey = getCacheKey(bean.getClass(), beanName);
+			// 从早期代理引用中移除一个与 bean 对应的缓存对象，如果已经创建了，就不需要再创建了，直接返回原始的 bean
 			if (this.earlyProxyReferences.remove(cacheKey) != bean) {
+				// 对 bean 进行包装，包装后再返回
 				return wrapIfNecessary(bean, beanName, cacheKey);
 			}
 		}
@@ -326,27 +329,46 @@ public abstract class AbstractAutoProxyCreator extends ProxyProcessorSupport
 	 * @return a proxy wrapping the bean, or the raw bean instance as-is
 	 */
 	protected Object wrapIfNecessary(Object bean, String beanName, Object cacheKey) {
+		// 检查传入的 beanName 是否有长度并且是否包含在 targetSourcedBeans 中。
+		// 如果 beanName 有长度且在 targetSourcedBeans 中存在，说明这个 Bean 是由自定义的 TargetSource 提供的，
+		// 通常已经是代理对象了，所以直接返回原始的 bean，不再进行代理。
 		if (StringUtils.hasLength(beanName) && this.targetSourcedBeans.contains(beanName)) {
 			return bean;
 		}
+
+		// 检查 advisedBeans 中是否存在与 cacheKey 对应的缓存值，如果存在且为 Boolean.FALSE，
+		// 说明这个 Bean 之前已经判断过不需要进行代理，同样直接返回原始的 bean，不再进行代理。
 		if (Boolean.FALSE.equals(this.advisedBeans.get(cacheKey))) {
 			return bean;
 		}
+
+		// 判断 bean 的类型是否属于基础设施类（Infrastructure Class），或者是否应该跳过对这个 Bean 的代理操作。
+		// 如果是，直接返回原始 bean。这个步骤用于过滤掉一些不需要代理的 Bean，例如 Spring 框架内部的一些核心类。
 		if (isInfrastructureClass(bean.getClass()) || shouldSkip(bean.getClass(), beanName)) {
 			this.advisedBeans.put(cacheKey, Boolean.FALSE);
 			return bean;
 		}
 
 		// Create proxy if we have advice.
+
+		// 获取符合条件的通知和切面
 		Object[] specificInterceptors = getAdvicesAndAdvisorsForBean(bean.getClass(), beanName, null);
+
+		// 如果结果不为空
 		if (specificInterceptors != DO_NOT_PROXY) {
+			// 将其添加到 advisedBeans 中，value 为 true，表示已经被代理了
 			this.advisedBeans.put(cacheKey, Boolean.TRUE);
+
+			// 创建代理对象
 			Object proxy = createProxy(
 					bean.getClass(), beanName, specificInterceptors, new SingletonTargetSource(bean));
+
+			// 将创建出的代理对象的 class 添加到 proxyTypes 中
 			this.proxyTypes.put(cacheKey, proxy.getClass());
 			return proxy;
 		}
 
+		// 标记 false，表明没有被代理
 		this.advisedBeans.put(cacheKey, Boolean.FALSE);
 		return bean;
 	}
@@ -436,47 +458,71 @@ public abstract class AbstractAutoProxyCreator extends ProxyProcessorSupport
 	protected Object createProxy(Class<?> beanClass, @Nullable String beanName,
 			@Nullable Object[] specificInterceptors, TargetSource targetSource) {
 
+		// 如果beanFactory是ConfigurableListableBeanFactory，则将目标类暴露出来。
+		// 因为Spring AOP默认使用JDK动态代理，但对于某些情况，例如有引介增强的情况，需要访问目标类的方法。
 		if (this.beanFactory instanceof ConfigurableListableBeanFactory) {
 			AutoProxyUtils.exposeTargetClass((ConfigurableListableBeanFactory) this.beanFactory, beanName, beanClass);
 		}
 
+		// 创建一个ProxyFactory对象，用于配置和创建代理
 		ProxyFactory proxyFactory = new ProxyFactory();
+		// 将 AnnotationAwareAspectJAutoProxyCreator 中的部分属性拷贝到代理工厂里
 		proxyFactory.copyFrom(this);
 
+		// 判断是基于类代理还是基于接口代理的，如果 proxyTargetClass 为 true，说明是基于类代理
 		if (proxyFactory.isProxyTargetClass()) {
 			// Explicit handling of JDK proxy targets and lambdas (for introduction advice scenarios)
+			// 检查beanClass是否是JDK代理类（通过Proxy.isProxyClass(beanClass)）或Lambda表达式类（通过ClassUtils.isLambdaClass(beanClass)）
 			if (Proxy.isProxyClass(beanClass) || ClassUtils.isLambdaClass(beanClass)) {
 				// Must allow for introductions; can't just set interfaces to the proxy's interfaces only.
+				// 如果beanClass是JDK代理类或Lambda表达式类，表示它们是特殊情况，需要进行特殊处理以支持引介增强
+				// 循环遍历beanClass的接口（通过beanClass.getInterfaces()），并将每个接口添加到proxyFactory中，以确保代理对象继承这些接口
 				for (Class<?> ifc : beanClass.getInterfaces()) {
 					proxyFactory.addInterface(ifc);
 				}
 			}
 		}
 		else {
+			// 基于接口代理的情况
 			// No proxyTargetClass flag enforced, let's apply our default checks...
+
+			// 判断是否配置了 preserveTargetClass 属性，这个属性可以人为控制是否要基于类代理还是接口代理
 			if (shouldProxyTargetClass(beanClass, beanName)) {
+				// 如果配置了，则将 proxyTargetClass 属性设置为 true
 				proxyFactory.setProxyTargetClass(true);
 			}
 			else {
+				// 基于接口代理，如果目标类有接口，则 proxyFactory.addInterface(ifc); 将接口添加到 proxyFactory 中
+				// 如果目标类没有接口，则基于类代理，将 proxyTargetClass 属性设置为 true
 				evaluateProxyInterfaces(beanClass, proxyFactory);
 			}
 		}
 
+		// 将特定拦截器和通用拦截器组合到一起后统一格式为 Advisor 后返回
 		Advisor[] advisors = buildAdvisors(beanName, specificInterceptors);
+		// 将组合后的拦截器设置到代理工厂里
 		proxyFactory.addAdvisors(advisors);
+		// 设置代理的目标类
 		proxyFactory.setTargetSource(targetSource);
+		// 自定义代理工厂，提供了一个用于自定义配置的扩展点，允许在代理对象创建之前进行必要的配置调整
 		customizeProxyFactory(proxyFactory);
 
+		// 设置冻结参数，即是否允许在创建代理后对 ProxyFactory 进行进一步的修改
 		proxyFactory.setFrozen(this.freezeProxy);
+		// 检查 Advisor 是否已经在创建代理时进行了预过滤
 		if (advisorsPreFiltered()) {
+			// 告知代理工厂无需再次过滤 Advisor
 			proxyFactory.setPreFiltered(true);
 		}
 
 		// Use original ClassLoader if bean class not locally loaded in overriding class loader
+		// 获取用于加载代理对象的类的 ClassLoader
 		ClassLoader classLoader = getProxyClassLoader();
 		if (classLoader instanceof SmartClassLoader && classLoader != beanClass.getClassLoader()) {
 			classLoader = ((SmartClassLoader) classLoader).getOriginalClassLoader();
 		}
+
+		// 通过代理工厂来创建代理
 		return proxyFactory.getProxy(classLoader);
 	}
 
@@ -518,14 +564,20 @@ public abstract class AbstractAutoProxyCreator extends ProxyProcessorSupport
 	 */
 	protected Advisor[] buildAdvisors(@Nullable String beanName, @Nullable Object[] specificInterceptors) {
 		// Handle prototypes correctly...
+		// 解析通用拦截器的名称，以获得通用拦截器的数组，这些通用拦截器通常在配置中定义
 		Advisor[] commonInterceptors = resolveInterceptorNames();
 
+		// 创建一个空的 allInterceptors 列表，以便将特定拦截器和通用拦截器组合到一起
 		List<Object> allInterceptors = new ArrayList<>();
+
 		if (specificInterceptors != null) {
+			// 如果存在特定拦截器不为 null 且长度大于 0，则将它们添加到 allInterceptors 列表中。
 			if (specificInterceptors.length > 0) {
 				// specificInterceptors may equal PROXY_WITHOUT_ADDITIONAL_INTERCEPTORS
 				allInterceptors.addAll(Arrays.asList(specificInterceptors));
 			}
+
+			// 如果存在通用拦截器，则根据 applyCommonInterceptorsFirst 属性的值，将它们添加到 allInterceptors 列表的开头或末尾。
 			if (commonInterceptors.length > 0) {
 				if (this.applyCommonInterceptorsFirst) {
 					allInterceptors.addAll(0, Arrays.asList(commonInterceptors));
@@ -542,8 +594,11 @@ public abstract class AbstractAutoProxyCreator extends ProxyProcessorSupport
 					" common interceptors and " + nrOfSpecificInterceptors + " specific interceptors");
 		}
 
+		// 创建一个与 allInterceptors 列表大小相同的Advisors数组
 		Advisor[] advisors = new Advisor[allInterceptors.size()];
 		for (int i = 0; i < allInterceptors.size(); i++) {
+			// 将 allInterceptors 列表中的每个拦截器包装为 Advisor（通知器），并将这些 Advisors 存储在Advisors数组中
+			// Spring中增强方式有很多种，为了通用则统一封装
 			advisors[i] = this.advisorAdapterRegistry.wrap(allInterceptors.get(i));
 		}
 		return advisors;

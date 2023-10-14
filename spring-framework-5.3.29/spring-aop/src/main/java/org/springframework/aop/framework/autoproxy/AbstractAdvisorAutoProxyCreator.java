@@ -74,7 +74,7 @@ public abstract class AbstractAdvisorAutoProxyCreator extends AbstractAutoProxyC
 	@Nullable
 	protected Object[] getAdvicesAndAdvisorsForBean(
 			Class<?> beanClass, String beanName, @Nullable TargetSource targetSource) {
-
+		// 获取符合条件的通知和切面并当做数组返回
 		List<Advisor> advisors = findEligibleAdvisors(beanClass, beanName);
 		if (advisors.isEmpty()) {
 			return DO_NOT_PROXY;
@@ -93,12 +93,19 @@ public abstract class AbstractAdvisorAutoProxyCreator extends AbstractAutoProxyC
 	 * @see #extendAdvisors
 	 */
 	protected List<Advisor> findEligibleAdvisors(Class<?> beanClass, String beanName) {
+		// 获取所有的候选的 advisor也就是获取所有添加了 @Aspect 注解的切面类里面所有添加了 @Around, @Before, @After, @AfterReturning, @AfterThrowing 注解的方法
 		List<Advisor> candidateAdvisors = findCandidateAdvisors();
+		// 筛选出符合应用条件的 advisor
 		List<Advisor> eligibleAdvisors = findAdvisorsThatCanApply(candidateAdvisors, beanClass, beanName);
+
+		// 引入额外的 advisor
 		extendAdvisors(eligibleAdvisors);
+
+		// 如果 advisor 列表不为空，则进行排序
 		if (!eligibleAdvisors.isEmpty()) {
 			eligibleAdvisors = sortAdvisors(eligibleAdvisors);
 		}
+		// 返回
 		return eligibleAdvisors;
 	}
 
@@ -122,12 +129,22 @@ public abstract class AbstractAdvisorAutoProxyCreator extends AbstractAutoProxyC
 	 */
 	protected List<Advisor> findAdvisorsThatCanApply(
 			List<Advisor> candidateAdvisors, Class<?> beanClass, String beanName) {
-
+		/**
+		 * 通过 currentProxiedBeanName 这个线程局部变量（ThreadLocal）来存储当前代理的 Bean 名称。
+		 *
+		 * 线程局部变量是一种特殊的变量，每个线程都有其独立的副本，互不干扰。这意味着在多线程环境中，
+		 * 每个线程都可以独立设置和访问 currentProxiedBeanName 的值，而不会相互影响。
+		 *
+		 * 通常，这个方法用于在 AOP 操作中标识当前正在被代理的 Bean 的名称，以便在 AOP 切面中可以获取并使用这个名称。
+		 * 这对于记录日志、跟踪或其他与特定 Bean 实例相关的操作非常有用。
+		 */
 		ProxyCreationContext.setCurrentProxiedBeanName(beanName);
 		try {
+			// 找到符合条件的 advisor
 			return AopUtils.findAdvisorsThatCanApply(candidateAdvisors, beanClass);
 		}
 		finally {
+			// 清除 ThreadLocal 中当前代理的 Bean 的名称
 			ProxyCreationContext.setCurrentProxiedBeanName(null);
 		}
 	}

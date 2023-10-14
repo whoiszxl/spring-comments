@@ -48,6 +48,20 @@ public abstract class ReflectionUtils {
 	/**
 	 * Pre-built {@link MethodFilter} that matches all non-bridge non-synthetic methods
 	 * which are not declared on {@code java.lang.Object}.
+	 *
+	 * 方法不能是桥接方法和合成方法
+	 *
+	 * 桥接方法有两种情况：
+	 *   1. 子类重写父类方法，子类方法返回值与父类方法返回值不一致，比如说父类方法返回类型为 Number，子类方法返回类型为 Integer
+	 * 	 2. 子类重写父类方法，父类方法里面带了泛型
+	 *
+	 * 合成方法：
+	 *   //TODO 合成方法补充
+	 *
+	 * 简单来说，桥接方法和合成方法是编译期内部需要而自己创建出来的，这一步操作就是为了排除掉编译器生成的方法，
+	 * 然后把用户自己定义的方法筛选出来。
+	 * 见名知意，USER_DECLARED_METHODS，很形象说明了这个方法过滤器的作用
+	 *
 	 * @since 3.0.5
 	 */
 	public static final MethodFilter USER_DECLARED_METHODS =
@@ -318,7 +332,9 @@ public abstract class ReflectionUtils {
 	 * @see #doWithMethods
 	 */
 	public static void doWithLocalMethods(Class<?> clazz, MethodCallback mc) {
+		// 获取 class 里所有的方法
 		Method[] methods = getDeclaredMethods(clazz, false);
+		// 遍历所有的方法，执行 mc 的 doWith 方法
 		for (Method method : methods) {
 			try {
 				mc.doWith(method);
@@ -360,10 +376,12 @@ public abstract class ReflectionUtils {
 		}
 		Method[] methods = getDeclaredMethods(clazz, false);
 		for (Method method : methods) {
+			// 使用 mf 进行过滤，添加了 @Pointcut 注解的需要过滤掉
 			if (mf != null && !mf.matches(method)) {
 				continue;
 			}
 			try {
+				// 调用回调方法，也就是 methods:add
 				mc.doWith(method);
 			}
 			catch (IllegalAccessException ex) {
@@ -371,6 +389,7 @@ public abstract class ReflectionUtils {
 			}
 		}
 		// Keep backing up the inheritance hierarchy.
+		// 检查是否有父类，并且（mf 不是用户定义方法 || 父类不是 Object）
 		if (clazz.getSuperclass() != null && (mf != USER_DECLARED_METHODS || clazz.getSuperclass() != Object.class)) {
 			doWithMethods(clazz.getSuperclass(), mc, mf);
 		}
@@ -664,6 +683,7 @@ public abstract class ReflectionUtils {
 	 * @see #doWithFields
 	 */
 	public static void doWithLocalFields(Class<?> clazz, FieldCallback fc) {
+		// 获取 class 上的所有字段，并遍历调用 fc 的 doWith 方法
 		for (Field field : getDeclaredFields(clazz)) {
 			try {
 				fc.doWith(field);

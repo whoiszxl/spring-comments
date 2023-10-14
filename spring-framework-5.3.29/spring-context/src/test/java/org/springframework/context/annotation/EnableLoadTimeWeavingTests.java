@@ -62,7 +62,7 @@ class EnableLoadTimeWeavingTests {
 		ctx.refresh();
 		LoadTimeWeaver loadTimeWeaver = ctx.getBean("loadTimeWeaver", LoadTimeWeaver.class);
 		// no expectations -> a class file transformer should NOT be added
-		// because no META-INF/aop.xml is present on the classpath
+		// because no META-INF/aopDemo.xml is present on the classpath
 		verifyNoInteractions(loadTimeWeaver);
 		ctx.close();
 	}

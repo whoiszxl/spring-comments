@@ -99,9 +99,13 @@ public class ProxyCreatorSupport extends AdvisedSupport {
 	 * create an AOP proxy with {@code this} as an argument.
 	 */
 	protected final synchronized AopProxy createAopProxy() {
+		// 检查active属性是否为false，如果是，则调用activate()方法激活代理工厂。
+		// 这是一个延迟初始化的过程，确保代理工厂已准备就绪
 		if (!this.active) {
 			activate();
 		}
+
+		// 获取AOP代理工厂，然后使用该工厂创建AOP代理对象
 		return getAopProxyFactory().createAopProxy(this);
 	}
 

@@ -46,9 +46,11 @@ public class AspectJAfterAdvice extends AbstractAspectJAdvice
 	@Nullable
 	public Object invoke(MethodInvocation mi) throws Throwable {
 		try {
+			// @After 增强方法执行前还有需要执行的增强方法
 			return mi.proceed();
 		}
 		finally {
+			// 执行完之前的增强方法后再执行 @After，无论是否有没有报错都要执行
 			invokeAdviceMethod(getJoinPointMatch(), null, null);
 		}
 	}

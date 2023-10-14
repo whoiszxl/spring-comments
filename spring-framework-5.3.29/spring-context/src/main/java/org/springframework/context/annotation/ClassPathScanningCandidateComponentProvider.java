@@ -204,9 +204,12 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	 */
 	@SuppressWarnings("unchecked")
 	protected void registerDefaultFilters() {
+		// 注册 Component 注解的过滤器
 		this.includeFilters.add(new AnnotationTypeFilter(Component.class));
+
 		ClassLoader cl = ClassPathScanningCandidateComponentProvider.class.getClassLoader();
 		try {
+			// 注册名为 ManagedBean 的过滤器
 			this.includeFilters.add(new AnnotationTypeFilter(
 					((Class<? extends Annotation>) ClassUtils.forName("javax.annotation.ManagedBean", cl)), false));
 			logger.trace("JSR-250 'javax.annotation.ManagedBean' found and supported for component scanning");
@@ -215,6 +218,7 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 			// JSR-250 1.1 API (as included in Java EE 6) not available - simply skip.
 		}
 		try {
+			// 注册名为 Named 的过滤器
 			this.includeFilters.add(new AnnotationTypeFilter(
 					((Class<? extends Annotation>) ClassUtils.forName("javax.inject.Named", cl)), false));
 			logger.trace("JSR-330 'javax.inject.Named' annotation found and supported for component scanning");
@@ -416,24 +420,38 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	private Set<BeanDefinition> scanCandidateComponents(String basePackage) {
 		Set<BeanDefinition> candidates = new LinkedHashSet<>();
 		try {
+			// 获取到包的实际搜索路径
+			// 如传入的路径为：com.whoiszxl.defaultAnnotation
+			// 计算后的路径为：classpath*:com/whoiszxl/defaultAnnotation/**/*.class
 			String packageSearchPath = ResourcePatternResolver.CLASSPATH_ALL_URL_PREFIX +
 					resolveBasePackage(basePackage) + '/' + this.resourcePattern;
+
+			// 通过资源解析器从此路径中拿到对应的资源，也就是这个包路径下所有的class类
 			Resource[] resources = getResourcePatternResolver().getResources(packageSearchPath);
 			boolean traceEnabled = logger.isTraceEnabled();
 			boolean debugEnabled = logger.isDebugEnabled();
+
+			// 遍历所有资源
 			for (Resource resource : resources) {
 				if (traceEnabled) {
 					logger.trace("Scanning " + resource);
 				}
 				try {
+					// 获取当前资源的元数据读取器
 					MetadataReader metadataReader = getMetadataReaderFactory().getMetadataReader(resource);
+					// 判断当前的资源是否符合候选的规则
 					if (isCandidateComponent(metadataReader)) {
+						// 将元数据读取器包装到一个新建的 ScannedGenericBeanDefinition 中
 						ScannedGenericBeanDefinition sbd = new ScannedGenericBeanDefinition(metadataReader);
+						// 将资源设置到 BeanDefinition 中
 						sbd.setSource(resource);
+
+						// 判断 ScannedGenericBeanDefinition 是否符合候选的条件
 						if (isCandidateComponent(sbd)) {
 							if (debugEnabled) {
 								logger.debug("Identified candidate component class: " + resource);
 							}
+							// 符合条件则添加到 candidates 中
 							candidates.add(sbd);
 						}
 						else {
@@ -485,11 +503,16 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	 * @return whether the class qualifies as a candidate component
 	 */
 	protected boolean isCandidateComponent(MetadataReader metadataReader) throws IOException {
+		// 判断class是否存在 excludeFilters 中的过滤器注解，存在直接返回 false 不允许注册
 		for (TypeFilter tf : this.excludeFilters) {
 			if (tf.match(metadataReader, getMetadataReaderFactory())) {
 				return false;
 			}
 		}
+
+		// 判断 class 是否存在 includeFilters 中的过滤器注解，存在则再通过 isConditionMatch 判断是否需要注册
+		// includeFilters 之前已经添加了 @Component 的注解，所以此处会将所有添加了 @Component 注解的 class 都过滤出来
+		// @Controller,@Service,@Repository 注解也会过滤出来，因为这些注解上自带了 @Component 注解，所以他们的本质都是一样的
 		for (TypeFilter tf : this.includeFilters) {
 			if (tf.match(metadataReader, getMetadataReaderFactory())) {
 				return isConditionMatch(metadataReader);
@@ -522,7 +545,10 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	 */
 	protected boolean isCandidateComponent(AnnotatedBeanDefinition beanDefinition) {
 		AnnotationMetadata metadata = beanDefinition.getMetadata();
-		return (metadata.isIndependent() && (metadata.isConcrete() ||
+
+		// 类没有依赖其他的类 && ( 不是接口和抽象类 || ( 是抽象类 && 指定了Lookup注解 ) )
+		return (metadata.isIndependent()
+				&& (metadata.isConcrete() ||
 				(metadata.isAbstract() && metadata.hasAnnotatedMethods(Lookup.class.getName()))));
 	}
 

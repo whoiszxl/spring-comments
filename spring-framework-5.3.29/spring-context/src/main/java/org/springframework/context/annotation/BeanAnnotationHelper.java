@@ -45,16 +45,23 @@ abstract class BeanAnnotationHelper {
 		String beanName = beanNameCache.get(beanMethod);
 		if (beanName == null) {
 			// By default, the bean name is the name of the @Bean-annotated method
+			// 默认，这个 bean 的名称是方法的名称
 			beanName = beanMethod.getName();
+
 			// Check to see if the user has explicitly set a custom bean name...
+			// 获取 @Bean 注解里的属性值
 			AnnotationAttributes bean =
 					AnnotatedElementUtils.findMergedAnnotationAttributes(beanMethod, Bean.class, false, false);
 			if (bean != null) {
+				// 获取 @Bean 里的 name 集合
 				String[] names = bean.getStringArray("name");
+				// 如果存在多个，则取第一个
 				if (names.length > 0) {
 					beanName = names[0];
 				}
 			}
+
+			// 添加到缓存，方便下次直接获取，避免重复解析
 			beanNameCache.put(beanMethod, beanName);
 		}
 		return beanName;

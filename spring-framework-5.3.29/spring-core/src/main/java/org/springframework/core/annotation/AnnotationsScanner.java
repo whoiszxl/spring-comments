@@ -507,6 +507,7 @@ abstract class AnnotationsScanner {
 	}
 
 	static boolean hasPlainJavaAnnotationsOnly(Class<?> type) {
+		// ( bean 的类名以 java. 开头 || 类是 Ordered 注解 )
 		return (type.getName().startsWith("java.") || type == Ordered.class);
 	}
 

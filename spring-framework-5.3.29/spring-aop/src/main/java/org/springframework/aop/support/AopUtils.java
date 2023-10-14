@@ -223,10 +223,13 @@ public abstract class AopUtils {
 	 */
 	public static boolean canApply(Pointcut pc, Class<?> targetClass, boolean hasIntroductions) {
 		Assert.notNull(pc, "Pointcut must not be null");
+
+		// 检查切点的类过滤器是否与目标类匹配。如果类过滤器不匹配目标类，即不适用于该类，就会返回false，否则继续下一步检查
 		if (!pc.getClassFilter().matches(targetClass)) {
 			return false;
 		}
 
+		// 方法匹配器是MethodMatcher.TRUE，表示它匹配任何方法，那么不需要进一步检查，直接返回true。
 		MethodMatcher methodMatcher = pc.getMethodMatcher();
 		if (methodMatcher == MethodMatcher.TRUE) {
 			// No need to iterate the methods if we're matching any method anyway...
@@ -244,6 +247,7 @@ public abstract class AopUtils {
 		}
 		classes.addAll(ClassUtils.getAllInterfacesForClassAsSet(targetClass));
 
+		// 遍历目标类及其接口中的所有方法，检查每个方法是否与切点匹配
 		for (Class<?> clazz : classes) {
 			Method[] methods = ReflectionUtils.getAllDeclaredMethods(clazz);
 			for (Method method : methods) {
@@ -281,9 +285,12 @@ public abstract class AopUtils {
 	 * @return whether the pointcut can apply on any method
 	 */
 	public static boolean canApply(Advisor advisor, Class<?> targetClass, boolean hasIntroductions) {
+		// 如果 advisor 是引介增强的 IntroductionAdvisor，则需要对类级别的进行匹配
 		if (advisor instanceof IntroductionAdvisor) {
 			return ((IntroductionAdvisor) advisor).getClassFilter().matches(targetClass);
 		}
+
+		// 如果 advisor 是普通增强的 PointcutAdvisor，则需要对方法级别的进行匹配
 		else if (advisor instanceof PointcutAdvisor) {
 			PointcutAdvisor pca = (PointcutAdvisor) advisor;
 			return canApply(pca.getPointcut(), targetClass, hasIntroductions);
@@ -303,21 +310,42 @@ public abstract class AopUtils {
 	 * (may be the incoming List as-is)
 	 */
 	public static List<Advisor> findAdvisorsThatCanApply(List<Advisor> candidateAdvisors, Class<?> clazz) {
+		// 如果候选 advisor 集合为空，则直接返回
 		if (candidateAdvisors.isEmpty()) {
 			return candidateAdvisors;
 		}
+
+		/**
+		 * 处理引介增强的逻辑，粒度为类级别。此处不走这个流程
+		 *
+		 * 引介增强允许将新的接口和实现引入到目标对象中，这些接口和实现在目标对象中是不可用的。它允许将新功能添加到现有的类中，
+		 * 而不需要修改现有的类。引介增强是一种结构性增强，通常不会直接影响方法的执行，而是为目标对象添加新的行为或接口。
+		 *
+		 * 例子： 假设有一个名为 Auditable 的接口，用于记录对象的审计信息（例如，谁创建了该对象，创建时间等）。
+		 * 可以使用引介增强将这个 Auditable 接口引入到多个领域对象中，而无需在每个对象中手动实现 Auditable 接口。
+		 * 引介增强允许将这些通用的功能引入到多个类中，而不需要污染它们的继承结构。
+		 */
 		List<Advisor> eligibleAdvisors = new ArrayList<>();
 		for (Advisor candidate : candidateAdvisors) {
 			if (candidate instanceof IntroductionAdvisor && canApply(candidate, clazz)) {
 				eligibleAdvisors.add(candidate);
 			}
 		}
+
+		// 获取是否有引介增强的状态
 		boolean hasIntroductions = !eligibleAdvisors.isEmpty();
+
 		for (Advisor candidate : candidateAdvisors) {
+			// 跳过引介增强的 advisor
 			if (candidate instanceof IntroductionAdvisor) {
 				// already processed
 				continue;
 			}
+
+			// 普通增强逻辑
+			// 包括前置增强（Before Advice）、后置增强（After Advice）、环绕增强（Around Advice）等。
+			// 这些增强主要用于在目标方法执行前、执行后或环绕目标方法的执行，添加额外的行为。它们是对方法调用的直接影响。
+			// 例如，前置增强可以在方法调用之前执行某些逻辑，后置增强可以在方法调用之后执行某些逻辑，环绕增强可以完全控制目标方法的执行。
 			if (canApply(candidate, clazz, hasIntroductions)) {
 				eligibleAdvisors.add(candidate);
 			}

@@ -190,11 +190,16 @@ public class AspectJExpressionPointcut extends AbstractExpressionPointcut
 	 * lazily building the underlying AspectJ pointcut expression.
 	 */
 	private PointcutExpression obtainPointcutExpression() {
+		// 判断是否设置过表达式，这个表达式就是配置的 @Pointcut 切点注解
 		if (getExpression() == null) {
 			throw new IllegalStateException("Must set property 'expression' before attempting to match");
 		}
+
+		// 接着判断是否已经初始化了切点的表达式，如果没有则初始化
 		if (this.pointcutExpression == null) {
+			// 确定用于构建切点表达式的类加载器
 			this.pointcutClassLoader = determinePointcutClassLoader();
+			// 实际构建切点表达式对象，这个对象里的信息也就是添加了 @Pointcut 注解的方法的相关信息
 			this.pointcutExpression = buildPointcutExpression(this.pointcutClassLoader);
 		}
 		return this.pointcutExpression;
@@ -218,12 +223,18 @@ public class AspectJExpressionPointcut extends AbstractExpressionPointcut
 	 * Build the underlying AspectJ pointcut expression.
 	 */
 	private PointcutExpression buildPointcutExpression(@Nullable ClassLoader classLoader) {
+		// 初始化AspectJ的切点解析器
 		PointcutParser parser = initializePointcutParser(classLoader);
+
+		// 创建一个 PointcutParameter 数组，该数组用于表示切点表达式中的参数
 		PointcutParameter[] pointcutParameters = new PointcutParameter[this.pointcutParameterNames.length];
+
+		// 创建对应的 PointcutParameter 对象后添加到切点参数数组中
 		for (int i = 0; i < pointcutParameters.length; i++) {
 			pointcutParameters[i] = parser.createPointcutParameter(
 					this.pointcutParameterNames[i], this.pointcutParameterTypes[i]);
 		}
+		// 构建切点表达式对象并返回
 		return parser.parsePointcutExpression(replaceBooleanOperators(resolveExpression()),
 				this.pointcutDeclarationScope, pointcutParameters);
 	}
@@ -291,12 +302,15 @@ public class AspectJExpressionPointcut extends AbstractExpressionPointcut
 
 	@Override
 	public boolean matches(Method method, Class<?> targetClass, boolean hasIntroductions) {
+		// 检查切点表达式是否解析完成，未解析完则初始化
 		obtainPointcutExpression();
+		// 匹配操作
 		ShadowMatch shadowMatch = getTargetShadowMatch(method, targetClass);
 
 		// Special handling for this, target, @this, @target, @annotation
 		// in Spring - we can optimize since we know we have exactly this class,
 		// and there will never be matching subclass at runtime.
+		// 如果匹配上了则返回 true，表示这个类需要创建代理
 		if (shadowMatch.alwaysMatches()) {
 			return true;
 		}
@@ -444,11 +458,13 @@ public class AspectJExpressionPointcut extends AbstractExpressionPointcut
 				}
 			}
 		}
+		// 匹配操作
 		return getShadowMatch(targetMethod, method);
 	}
 
 	private ShadowMatch getShadowMatch(Method targetMethod, Method originalMethod) {
 		// Avoid lock contention for known Methods through concurrent access...
+		// 从缓存获取目标方法对应的 ShadowMatch，如果不存在，则通过双重检查锁的方式进行初始化
 		ShadowMatch shadowMatch = this.shadowMatchCache.get(targetMethod);
 		if (shadowMatch == null) {
 			synchronized (this.shadowMatchCache) {
@@ -459,6 +475,7 @@ public class AspectJExpressionPointcut extends AbstractExpressionPointcut
 					Method methodToMatch = targetMethod;
 					try {
 						try {
+							// 使用 aspectj 库来进行匹配判断
 							shadowMatch = obtainPointcutExpression().matchesMethodExecution(methodToMatch);
 						}
 						catch (ReflectionWorldException ex) {

@@ -54,6 +54,17 @@ public class DefaultAopProxyFactory implements AopProxyFactory, Serializable {
 
 	@Override
 	public AopProxy createAopProxy(AdvisedSupport config) throws AopConfigException {
+		/**
+		 * 1. !NativeDetector.inNativeImage(): 首先检查是否运行在 Native Image 环境中，
+		 * 如果是，将使用 JDK 动态代理（因为CGLIB在Native Image中不支持）
+		 *
+		 * 2. config.isOptimize(): 如果配置中标志了 optimize 属性为 true，将使用 CGLIB 代理。
+		 *
+		 * 3. config.isProxyTargetClass(): 如果配置中标志了 proxyTargetClass 属性为 true，将使用 CGLIB 代理
+		 *
+		 * 4. hasNoUserSuppliedProxyInterfaces(config): 如果目标类没有实现任何接口或者实现了接口并且接口类型是 SpringProxy，
+		 * 则使用CGLIB代理。
+		 */
 		if (!NativeDetector.inNativeImage() &&
 				(config.isOptimize() || config.isProxyTargetClass() || hasNoUserSuppliedProxyInterfaces(config))) {
 			Class<?> targetClass = config.getTargetClass();
@@ -61,12 +72,15 @@ public class DefaultAopProxyFactory implements AopProxyFactory, Serializable {
 				throw new AopConfigException("TargetSource cannot determine target class: " +
 						"Either an interface or a target is required for proxy creation.");
 			}
+			// 如果目标类是接口或者是代理类或者是lambda的类，使用 JDK 动态代理
 			if (targetClass.isInterface() || Proxy.isProxyClass(targetClass) || ClassUtils.isLambdaClass(targetClass)) {
 				return new JdkDynamicAopProxy(config);
 			}
+			// 否则使用 CGLIB 动态代理
 			return new ObjenesisCglibAopProxy(config);
 		}
 		else {
+			// 默认走JDK动态代理的方式，没有开启优化，没有指定代理目标类，没有非用户定义的代理接口
 			return new JdkDynamicAopProxy(config);
 		}
 	}

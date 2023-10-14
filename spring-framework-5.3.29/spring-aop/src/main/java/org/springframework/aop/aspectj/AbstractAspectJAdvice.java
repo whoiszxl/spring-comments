@@ -167,11 +167,17 @@ public abstract class AbstractAspectJAdvice implements Advice, AspectJPrecedence
 			Method aspectJAdviceMethod, AspectJExpressionPointcut pointcut, AspectInstanceFactory aspectInstanceFactory) {
 
 		Assert.notNull(aspectJAdviceMethod, "Advice method must not be null");
+		// 设置声明类
 		this.declaringClass = aspectJAdviceMethod.getDeclaringClass();
+		// 设置方法名
 		this.methodName = aspectJAdviceMethod.getName();
+		// 设置参数信息
 		this.parameterTypes = aspectJAdviceMethod.getParameterTypes();
+		// 设置切面的增强方法
 		this.aspectJAdviceMethod = aspectJAdviceMethod;
+		// 设置切点
 		this.pointcut = pointcut;
+		// 设置切面实例工厂
 		this.aspectInstanceFactory = aspectInstanceFactory;
 	}
 
@@ -613,7 +619,12 @@ public abstract class AbstractAspectJAdvice implements Advice, AspectJPrecedence
 	protected Object invokeAdviceMethod(
 			@Nullable JoinPointMatch jpMatch, @Nullable Object returnValue, @Nullable Throwable ex)
 			throws Throwable {
-
+		// 调用增强的方法，带上返回参数，因为此处需要把返回值丢给增强方法使用
+		//
+		// 	@AfterReturning(value = "pointcut()", returning = "returnValue")
+		//	public void afterReturning(JoinPoint joinPoint, Object returnValue) {
+		//		System.out.printf("afterReturning, 方法：%s, 参数：%s \n", joinPoint.getSignature().getName(), returnValue);
+		//	}
 		return invokeAdviceMethodWithGivenArgs(argBinding(getJoinPoint(), jpMatch, returnValue, ex));
 	}
 
@@ -631,6 +642,7 @@ public abstract class AbstractAspectJAdvice implements Advice, AspectJPrecedence
 		}
 		try {
 			ReflectionUtils.makeAccessible(this.aspectJAdviceMethod);
+			// 执行增强方法，并带上参数
 			return this.aspectJAdviceMethod.invoke(this.aspectInstanceFactory.getAspectInstance(), actualArgs);
 		}
 		catch (IllegalArgumentException ex) {

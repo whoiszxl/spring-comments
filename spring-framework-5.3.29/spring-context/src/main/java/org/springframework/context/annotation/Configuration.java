@@ -421,7 +421,7 @@ import org.springframework.stereotype.Component;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
-@Component
+@Component // @Configuration 注解也添加了 @Component 注解
 public @interface Configuration {
 
 	/**

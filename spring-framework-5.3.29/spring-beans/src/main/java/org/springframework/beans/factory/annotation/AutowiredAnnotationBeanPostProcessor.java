@@ -159,6 +159,7 @@ public class AutowiredAnnotationBeanPostProcessor implements SmartInstantiationA
 	 */
 	@SuppressWarnings("unchecked")
 	public AutowiredAnnotationBeanPostProcessor() {
+		// 初始化时添加注解：[Autowired, Value, Inject]
 		this.autowiredAnnotationTypes.add(Autowired.class);
 		this.autowiredAnnotationTypes.add(Value.class);
 		try {
@@ -392,10 +393,17 @@ public class AutowiredAnnotationBeanPostProcessor implements SmartInstantiationA
 		return (candidateConstructors.length > 0 ? candidateConstructors : null);
 	}
 
+	/**
+	 * 此方法在 Bean 对象实例化和属性注入之后被调用
+	 */
 	@Override
 	public PropertyValues postProcessProperties(PropertyValues pvs, Object bean, String beanName) {
+		// 查找需要进行自动注入的属性（字段或方法参数）的元数据信息。
+		// 这个方法通常会检查Bean对象上的@Autowired、@Value等注解，以确定哪些属性需要注入
 		InjectionMetadata metadata = findAutowiringMetadata(beanName, bean.getClass(), pvs);
+
 		try {
+			// 实现属性注入
 			metadata.inject(bean, beanName, pvs);
 		}
 		catch (BeanCreationException ex) {
@@ -440,16 +448,24 @@ public class AutowiredAnnotationBeanPostProcessor implements SmartInstantiationA
 
 	private InjectionMetadata findAutowiringMetadata(String beanName, Class<?> clazz, @Nullable PropertyValues pvs) {
 		// Fall back to class name as cache key, for backwards compatibility with custom callers.
+		// beanName 存在则使用其做缓存 key，否则用类名
 		String cacheKey = (StringUtils.hasLength(beanName) ? beanName : clazz.getName());
+
 		// Quick check on the concurrent map first, with minimal locking.
+		// 从缓存中先获取需要注入的元数据信息
 		InjectionMetadata metadata = this.injectionMetadataCache.get(cacheKey);
+
+		// 如果没有缓存信息
 		if (InjectionMetadata.needsRefresh(metadata, clazz)) {
+			// 加锁，确保只有一个线程可以构建元数据缓存信息
 			synchronized (this.injectionMetadataCache) {
 				metadata = this.injectionMetadataCache.get(cacheKey);
+				// 双重检查
 				if (InjectionMetadata.needsRefresh(metadata, clazz)) {
 					if (metadata != null) {
 						metadata.clear(pvs);
 					}
+					// 构建 @Autowired 注解的元数据，并放入缓存，方便后续获取提高性能
 					metadata = buildAutowiringMetadata(clazz);
 					this.injectionMetadataCache.put(cacheKey, metadata);
 				}
@@ -459,6 +475,8 @@ public class AutowiredAnnotationBeanPostProcessor implements SmartInstantiationA
 	}
 
 	private InjectionMetadata buildAutowiringMetadata(Class<?> clazz) {
+		// 快速判断 Class 是否符合候选条件，避免不必要的进一步检查
+		// 注解为：[Autowired, Value, Inject]
 		if (!AnnotationUtils.isCandidateClass(clazz, this.autowiredAnnotationTypes)) {
 			return InjectionMetadata.EMPTY;
 		}
@@ -469,58 +487,94 @@ public class AutowiredAnnotationBeanPostProcessor implements SmartInstantiationA
 		do {
 			final List<InjectionMetadata.InjectedElement> currElements = new ArrayList<>();
 
+			// 字段处理: 遍历目标类 clazz 的所有字段，查找是否存在自动装配注解（如 @Autowired）
 			ReflectionUtils.doWithLocalFields(targetClass, field -> {
+				// 从字段中获取到注解信息
 				MergedAnnotation<?> ann = findAutowiredAnnotation(field);
 				if (ann != null) {
+					// 如果注解存在，并且字段是 static 修饰的，则直接打印日志：@Autowired 注解不支持加在 static 静态字段上
 					if (Modifier.isStatic(field.getModifiers())) {
 						if (logger.isInfoEnabled()) {
 							logger.info("Autowired annotation is not supported on static fields: " + field);
 						}
 						return;
 					}
+
+					// 如果不是静态修饰的，则获取到注解中 required 的属性值，默认为 true
 					boolean required = determineRequiredStatus(ann);
+					// 将注解中的信息封装到 AutowiredFieldElement 并添加到 currElements 集合中
 					currElements.add(new AutowiredFieldElement(field, required));
 				}
 			});
 
+			// 方法处理: 处理流程和字段处理的方式大致相同
 			ReflectionUtils.doWithLocalMethods(targetClass, method -> {
+				/**
+				 * 判断当前方法是否是桥接方法，桥接方法有两种情况：
+				 * 1. 子类重写父类方法，子类方法返回值与父类方法返回值不一致，比如说父类方法返回类型为 Number，子类方法返回类型为 Integer
+				 * 2. 子类重写父类方法，父类方法里面带了泛型
+				 */
 				Method bridgedMethod = BridgeMethodResolver.findBridgedMethod(method);
+				// 检查方法 method 是否是一个可见性桥接方法对（visibility bridge method pair）。
+				// 如果不是，就跳过此方法，不执行后续操作，避免处理不必要的桥接方法。
 				if (!BridgeMethodResolver.isVisibilityBridgeMethodPair(method, bridgedMethod)) {
 					return;
 				}
+
+				// 获取方法上的自动装配注解
 				MergedAnnotation<?> ann = findAutowiredAnnotation(bridgedMethod);
+				// 如果找到了自动装配注解并且当前方法是最具体的方法（不是父类或接口中的方法），则执行以下操作
 				if (ann != null && method.equals(ClassUtils.getMostSpecificMethod(method, clazz))) {
+					// 检查方法是否是静态方法。如果是静态方法记录一个日志：@Autowired 不支持静态方法
 					if (Modifier.isStatic(method.getModifiers())) {
 						if (logger.isInfoEnabled()) {
 							logger.info("Autowired annotation is not supported on static methods: " + method);
 						}
 						return;
 					}
+
+					// 检查方法是否没有参数。如果没有参数则记录一个日志，自动装配注解通常应该用于带有参数的方法。
 					if (method.getParameterCount() == 0) {
 						if (logger.isInfoEnabled()) {
 							logger.info("Autowired annotation should only be used on methods with parameters: " +
 									method);
 						}
 					}
+					// 获取注解上的 required 属性值
 					boolean required = determineRequiredStatus(ann);
+
+					// 找到与方法对应的属性描述符（PropertyDescriptor），这个描述符包含了有关属性的信息
 					PropertyDescriptor pd = BeanUtils.findPropertyForMethod(bridgedMethod, clazz);
+
+					// 将找到的方法包装成 AutowiredMethodElement 对象，并添加到 currElements 列表中
 					currElements.add(new AutowiredMethodElement(method, required, pd));
 				}
 			});
 
+			// 将所有的注解信息添加到 elements 中
 			elements.addAll(0, currElements);
+			// 获取父类进行循环处理
 			targetClass = targetClass.getSuperclass();
 		}
-		while (targetClass != null && targetClass != Object.class);
+		while (targetClass != null && targetClass != Object.class); // 循环直到目标类为 null 或者为 Object 对象
 
+		// 将注解信息包装成 InjectionMetadata 后返回
 		return InjectionMetadata.forElements(elements, clazz);
 	}
 
+	/**
+	 * 查找给定 AccessibleObject 对象（可以是字段或方法等）上是否存在自动装配注解（如 @Autowired）或其它指定的注解的方法。
+	 */
 	@Nullable
 	private MergedAnnotation<?> findAutowiredAnnotation(AccessibleObject ao) {
+		// 创建了一个 MergedAnnotations 对象，用于获取给定 AccessibleObject 上的所有注解信息
 		MergedAnnotations annotations = MergedAnnotations.from(ao);
+
+		// 遍历 @Autowired @Value @Inject 注解
 		for (Class<? extends Annotation> type : this.autowiredAnnotationTypes) {
+			// 从字段或方法中获取是否存在注解
 			MergedAnnotation<?> annotation = annotations.get(type);
+			// 注解存在则返回
 			if (annotation.isPresent()) {
 				return annotation;
 			}
@@ -553,6 +607,7 @@ public class AutowiredAnnotationBeanPostProcessor implements SmartInstantiationA
 	 */
 	@Deprecated
 	protected boolean determineRequiredStatus(AnnotationAttributes ann) {
+		// 注解中没有 required 属性或者配置了 required 属性为 true 则返回 true
 		return (!ann.containsKey(this.requiredParameterName) ||
 				this.requiredParameterValue == ann.getBoolean(this.requiredParameterName));
 	}
@@ -625,24 +680,34 @@ public class AutowiredAnnotationBeanPostProcessor implements SmartInstantiationA
 
 		@Override
 		protected void inject(Object bean, @Nullable String beanName, @Nullable PropertyValues pvs) throws Throwable {
+			// 字段注入，先获取到字段，比如控制器里的一个 helloService
 			Field field = (Field) this.member;
 			Object value;
+
+			// 判断是否存在缓存，有缓存则从缓存中取
 			if (this.cached) {
 				try {
+					// 从缓存中取
 					value = resolveCachedArgument(beanName, this.cachedFieldValue);
 				}
 				catch (BeansException ex) {
 					// Unexpected target bean mismatch for cached argument -> re-resolve
 					this.cached = false;
 					logger.debug("Failed to resolve cached argument", ex);
+					// 异常情况，自行解析字段值
 					value = resolveFieldValue(field, bean, beanName);
 				}
 			}
 			else {
+				// 没有缓存，自行解析字段值
 				value = resolveFieldValue(field, bean, beanName);
 			}
+
+			// 如果获取到了 value
 			if (value != null) {
+				// 确保字段的可访问性
 				ReflectionUtils.makeAccessible(field);
+				// 将值设置到目标对象的字段中，完成属性注入
 				field.set(bean, value);
 			}
 		}
@@ -705,30 +770,44 @@ public class AutowiredAnnotationBeanPostProcessor implements SmartInstantiationA
 			this.required = required;
 		}
 
+		/**
+		 * 方法注入
+		 */
 		@Override
 		protected void inject(Object bean, @Nullable String beanName, @Nullable PropertyValues pvs) throws Throwable {
+			// 检查是否需要跳过属性注入
 			if (checkPropertySkipping(pvs)) {
 				return;
 			}
+			// 获取到添加了 @Autowired 注解的方法
 			Method method = (Method) this.member;
 			Object[] arguments;
+
+			// 检查是否存在缓存
 			if (this.cached) {
 				try {
+					// 从缓存中获取方法的参数
 					arguments = resolveCachedArguments(beanName, this.cachedMethodArguments);
 				}
 				catch (BeansException ex) {
 					// Unexpected target bean mismatch for cached argument -> re-resolve
 					this.cached = false;
 					logger.debug("Failed to resolve cached argument", ex);
+					// 有异常，则重新解析方法的参数
 					arguments = resolveMethodArguments(method, bean, beanName);
 				}
 			}
 			else {
+				// 无缓存，直接解析方法的参数
 				arguments = resolveMethodArguments(method, bean, beanName);
 			}
+
+			// 方法参数存在的情况
 			if (arguments != null) {
 				try {
+					// 确保方法的可访问性
 					ReflectionUtils.makeAccessible(method);
+					// 调用方法，完成方法注入
 					method.invoke(bean, arguments);
 				}
 				catch (InvocationTargetException ex) {
